@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { numpy as np } from "jax-js";
 
 // test("x is 3", () => {
 //   expect(x).toBe(3);
@@ -15,7 +16,6 @@ import { expect, test } from "vitest";
 //   console.log(adapter.limits.maxVertexBufferArrayStride);
 // });
 
-test("can import jax.numpy", async () => {
-  const { numpy } = await import("jax-js");
-  expect(numpy).toBeDefined();
+test("can create array", () => {
+  np.array();
 });

@@ -41,5 +41,9 @@
     "tsup": "^8.3.6",
     "typescript": "~5.7.3",
     "vitest": "^3.0.5"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0"
   }
 }
