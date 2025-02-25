@@ -4,6 +4,8 @@ import { Array, ArrayLike } from "./numpy";
 import * as tree from "./tree";
 import type { JsTree, JsTreeDef } from "./tree";
 
+import "./polyfills";
+
 export { numpy, tree };
 
 // Convert a subtype of JsTree<A> into a JsTree<B>, with the same structure.
