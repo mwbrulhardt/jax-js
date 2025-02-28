@@ -22,9 +22,13 @@
   <pre class="mb-5 text-center"><code>npm install @jax-js/core</code></pre>
 
   <p class="mb-5">
-    And you had access to familiar array APIs, autograd, and linear algebra.
-    This is <em>all you need</em> for neural networks (AI), physics simulations,
-    statistics, image processing, and more. No setup, just start programming.
+    <code>jax-js</code> aims to bring familiar array APIs and
+    <a
+      class="link"
+      target="_blank"
+      href="https://en.wikipedia.org/wiki/Automatic_differentiation">autograd</a
+    > to the browser. So you can explore neural networks (AI), statistics, image
+    processing, and computational science on the web platform.
   </p>
 
   <div class="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
@@ -43,9 +47,11 @@
   </div>
 
   <p class="mb-5">
-    <code>jax-js</code> is a numerical computing library for web developers.
-    Like Python libraries (NumPy, PyTorch, JAX), it's carefully hand-optimized,
-    including a JIT compiler and scheduler for GPU kernels. But it's also
+    Like the Python libraries it's based on (NumPy, PyTorch, JAX), <code
+      >jax-js</code
+    >
+    is carefully hand-optimized, including a JIT compiler and scheduler for GPU kernels.
+    But it's also
     <strong>extremely simple and portable across the web</strong>. It runs on
     Chrome, Firefox, Safari, Arc, iOS, and Android.
   </p>
