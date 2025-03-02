@@ -12,24 +12,25 @@
     <p class="italic text-center">Numerical and GPU computing on the web</p>
   </div>
 
-  <p class="mb-5">
+  <p class="mb-6">
     Machine learning belongs in the browser—instantly accessible, and running on
-    local GPUs. But existing libraries weren't <em>designed for</em> the web.
+    local GPUs. But existing libraries are slow and weren't <em>designed for</em
+    > the web.
   </p>
 
-  <pre class="mb-5 text-center"><code>npm install @jax-js/core</code></pre>
+  <pre class="mb-6 text-center"><code>npm install @jax-js/core</code></pre>
 
-  <p class="mb-5">
-    <code>jax-js</code> brings arrays and
+  <p class="mb-6">
+    <code>jax-js</code> brings high-performance arrays and
     <a
       class="link"
       target="_blank"
       href="https://en.wikipedia.org/wiki/Automatic_differentiation">autograd</a
     > to JavaScript. So you can explore neural networks (AI), statistics, image processing,
-    and computational science, all on the web platform.
+    and computational science.
   </p>
 
-  <div class="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+  <div class="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
     <!-- TODO: Images -->
     <div class="aspect-video bg-gray-500">
       <span class="text-white text-xs italic">julia set</span>
@@ -45,7 +46,7 @@
     </div>
   </div>
 
-  <p class="mb-5">
+  <p class="mb-6">
     Like the Python libraries it's inspired by (NumPy, PyTorch, JAX), <code
       >jax-js</code
     >
@@ -56,31 +57,32 @@
     specialized kernels for a variety of hardware.
   </p>
 
-  <div class="mb-5 border h-48 flex items-center justify-center square-grid">
+  <div class="mb-6 border h-48 flex items-center justify-center square-grid">
     <p class="text-sm italic text-center">
       <!-- TODO: Insert graph -->
       Performance graph of flops: cpu, wasm, webgl, webgpu
     </p>
   </div>
 
-  <p class="mb-5">
+  <p class="mb-6">
     How is this possible? In short: we compile operations to shaders running in
-    WebAssembly, WebGL, and WebGPU on modern browsers. These are cross-platform
-    APIs, so it won't be quite as fast as native code. But we get pretty close,
-    even as the core library is featherweight and easy to use!
+    WebAssembly, WebGL, and WebGPU on modern browsers. With some performance
+    engineering, we can get close to native speed, despite being a featherweight
+    cross-platform API.
   </p>
 
-  <p class="mb-5">
+  <p class="mb-6">
     <span class="italic"
       >XXX (Performance benchmarks coming soon—though expect <code>jax-js</code>
-      to be faster than TensorFlow.js due to JIT.)</span
+      to be faster than TensorFlow.js even at running TensorFlow.js models due to
+      JIT and kernel efficiency.)</span
     >
   </p>
 
-  <p class="mb-5">
+  <p class="mb-6">
     Running GPU code should be as easy as making a website. With <code
       >jax-js</code
-    >, you can bring numerical computing to your users in the browser, with zero
+    >, you can bring neural networks to your users in the browser, with zero
     installs or setup.
   </p>
 
