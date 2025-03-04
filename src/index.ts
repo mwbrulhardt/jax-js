@@ -3,10 +3,11 @@ import * as numpy from "./numpy";
 import { Array, ArrayLike } from "./numpy";
 import * as tree from "./tree";
 import type { JsTree, JsTreeDef } from "./tree";
+import * as webgpu from "./backend/webgpu"; // Note: temporary
 
 import "./polyfills";
 
-export { numpy, tree };
+export { numpy, tree, webgpu };
 
 // Convert a subtype of JsTree<A> into a JsTree<B>, with the same structure.
 type MapJsTree<T, A, B> = T extends A
