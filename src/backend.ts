@@ -9,10 +9,12 @@
  * and dispatch happens on the level of each shader. Buffers are untyped.
  */
 
-import { WebGPUBackend } from "./backend/webgpu";
-
 export async function getBackend(backendName: string): Promise<Backend | null> {
-  if (backendName === "webgpu") {
+  if (backendName === "cpu") {
+    const { CPUBackend } = await import("./backend/cpu");
+    return new CPUBackend();
+  } else if (backendName === "webgpu") {
+    const { WebGPUBackend } = await import("./backend/webgpu");
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) return null;
     const device = await adapter.requestDevice();

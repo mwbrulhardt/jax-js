@@ -1,6 +1,7 @@
 import { Backend, BackendOp, Slot, SlotError } from "../backend";
 import { DEBUG } from "../utils";
 
+/** Implementation of `Backend` that uses WebGPU in browsers. */
 export class WebGPUBackend implements Backend {
   readonly pipelines: ShaderPipelineCache;
   readonly buffers: Map<Slot, { ref: number; buffer: GPUBuffer }>;
