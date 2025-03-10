@@ -10,5 +10,6 @@
       "@jax-js/core": ["."]
     },
     "types": ["@webgpu/types", "node"]
-  }
+  },
+  "exclude": ["./**/build", "./**/dist", "./**/node_modules"]
 }

@@ -26,6 +26,11 @@ export function rep<T>(
   return new Array(length).fill(value);
 }
 
+/** Shorthand for integer division, like in Python. */
+export function idiv(a: number, b: number): number {
+  return Math.floor(a / b);
+}
+
 /** Check if two objects are deep equal. */
 export function deepEqual(a: any, b: any): boolean {
   if (a === b) {

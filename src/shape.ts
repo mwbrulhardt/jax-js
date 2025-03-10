@@ -14,10 +14,12 @@
  * Originally based on tinygrad's implementation of shape tracking in the
  * `tinygrad.shape` module. But this version is simplified a bit. I'm not really
  * trying to innovate on shape tracking in this library, so if I have doubts on
- * something, it'll just be copied from tinygrad (with comments :D).
+ * something, it'll just be copied from tinygrad (with comments).
+ *
+ * This file is a bit longer than the original, since Python is more concise.
  */
 
-import { deepEqual, isPermutation, rep, zip } from "./utils";
+import { deepEqual, idiv, isPermutation, rep, zip } from "./utils";
 
 type Pair = [number, number];
 
@@ -43,6 +45,105 @@ function defaultStrides(shape: number[]): number[] {
   return strides;
 }
 
+/** Merge contiguous subparts or zero-strided dimensions in a view. */
+function mergeDims(
+  shape: number[],
+  strides: number[],
+  mask: Pair[] | null,
+): [number, number, number][] {
+  if (shape.length === 0) return [];
+  if (
+    shape.length !== strides.length ||
+    (mask && shape.length !== mask.length)
+  ) {
+    throw new Error("internal: invalid args to mergeDims");
+  }
+
+  // Returns: Array of [merged_size, stride, real_size]
+  // The "real size" only applies if there's a mask. It's the size after the
+  // last dimension with size greater than 1, but the mask only has size 1.
+  // Basically, after that point we can have stride 0 since it's masked.
+  const ret: [number, number, number][] = [
+    [shape[0], strides[0], strides[0] !== 0 ? shape[0] : 0],
+  ];
+
+  // Merge this dim to next dim if mask size is 1.
+  // In the original code, this is called "merging" and confusing since it also
+  // checks if shape[i] == 1, but that condition is a control flow no-op.
+  let mergeMask = mask && mask[0][1] - mask[0][0] === 1;
+  for (let i = 1; i < shape.length; i++) {
+    const [s, st] = [shape[i], strides[i]];
+    if (s === 1) continue; // Always merge 1
+    const [lastS, lastSt, lastPreExpandS] = ret[ret.length - 1];
+    if (mergeMask || lastSt === s * st) {
+      // Merge last dim with this dim if merging or strides matched.
+      // If merging due to mask of size 1, reset real size.
+      ret[ret.length - 1] = [lastS * s, st, mergeMask ? s : lastPreExpandS * s];
+    } else {
+      ret.push([s, st, s]);
+    }
+    mergeMask = mask && mask[i][1] - mask[i][0] === 1;
+  }
+
+  return ret;
+}
+
+/** Return the new mask if a reshape if possible, otherwise `null`. */
+function reshapeMask(
+  maskInput: Pair[],
+  oldShape: number[],
+  newShape: number[],
+): Pair[] | null {
+  const newMask: Pair[] = [];
+
+  // Create iterators for all three arrays in reverse order.
+  let rMasksI = maskInput.length;
+  let rShapeI = oldShape.length;
+  let rNewShapeI = newShape.length;
+  const rMasks = () => (rMasksI ? maskInput[--rMasksI] : ([0, 1] as Pair));
+  const rShape = () => (rShapeI ? oldShape[--rShapeI] : 1);
+  const rNewShape = () => (rNewShapeI ? newShape[--rNewShapeI] : 1);
+
+  let currStride = 1;
+  let [oldDim, newDim, mask] = [rShape(), rNewShape(), rMasks()];
+
+  while (newMask.length < newShape.length) {
+    const [l, r] = mask;
+    const nextStride = newDim * currStride;
+    // Need to split mask
+    if (oldDim === nextStride) {
+      newMask.push([idiv(l, currStride), idiv(r - 1, currStride) + 1]);
+      currStride = 1;
+      [oldDim, newDim, mask] = [rShape(), rNewShape(), rMasks()];
+    } else if (oldDim > nextStride) {
+      if (oldDim % nextStride !== 0) return null;
+      if (
+        (l % nextStride !== 0 || r % nextStride !== 0) &&
+        idiv(l, nextStride) !== idiv(r - 1, nextStride)
+      )
+        return null; // Stride doesn't divide evenly into the new mask.
+      newMask.push([
+        idiv(l % nextStride, currStride),
+        idiv((r - 1) % nextStride, currStride) + 1,
+      ]);
+      [currStride, newDim] = [nextStride, rNewShape()];
+    } else {
+      // oldDim < nextStride
+      const nextMask = rMasks();
+      // Combine if the mask can unfold continuously
+      if (
+        !deepEqual(mask, [0, oldDim]) &&
+        l !== r &&
+        nextMask[1] - nextMask[0] !== 1
+      )
+        return null;
+      mask = [nextMask[0] * oldDim + l, (nextMask[1] - 1) * oldDim + r];
+      oldDim *= rShape();
+    }
+  }
+  return newMask.reverse();
+}
+
 /**
  * A multidimensional view into memory. An array can be thought of as the
  * combination of a linear buffer of memory, along with a `View`.
@@ -53,6 +154,10 @@ function defaultStrides(shape: number[]): number[] {
  *   2. Otherwise, look at this memory address: offset + ∑(strides[i] * dim[i]).
  */
 class View {
+  // Cached, computed property values.
+  #size: number | undefined;
+  #contiguous: boolean | undefined;
+
   private constructor(
     /** The shape of the view (size of each dimension). */
     readonly shape: number[],
@@ -119,19 +224,21 @@ class View {
   }
 
   get size(): number {
-    return this.shape.reduce((a, b) => a * b, 1);
+    if (this.#size === undefined)
+      this.#size = this.shape.reduce((a, b) => a * b, 1);
+    return this.#size;
   }
 
   /** Whether this is a default, contiguous, unaltered view of the data (identity). */
   get contiguous(): boolean {
-    if (this.size === 0) {
-      return true;
+    if (this.#contiguous === undefined) {
+      this.#contiguous =
+        this.size === 0 ||
+        (this.offset === 0 &&
+          this.mask === null &&
+          deepEqual(this.strides, defaultStrides(this.shape)));
     }
-    return (
-      this.offset === 0 &&
-      this.mask === null &&
-      deepEqual(this.strides, defaultStrides(this.shape))
-    );
+    return this.#contiguous;
   }
 
   /**
@@ -279,6 +386,15 @@ class View {
     return View.create(v1.shape, strides, finalOffset, null);
   }
 
+  /** Attempt to simplify this view into a smaller reshaped form. */
+  minify(): View {
+    const minShape = mergeDims(this.shape, this.strides, this.mask).map(
+      (x) => x[0],
+    );
+    const nv = this.reshape(minShape);
+    return nv ? nv : this;
+  }
+
   /** Pad the view with zeros on each dimension. */
   pad(arg: Pair[]): View {
     if (arg.length !== this.ndim || !arg.every(([b, e]) => b >= 0 && e >= 0)) {
@@ -388,8 +504,53 @@ class View {
     if (deepEqual(this.shape, newShape)) return this;
     if (newShape.some((s) => s < 0))
       throw new Error(`Reshape cannot have negative numbers ${jstr(newShape)}`);
+    if (this.size !== newShape.reduce((a, b) => a * b, 1))
+      throw new Error(`Reshape size ${jstr(this.shape)} -> ${jstr(newShape)}`);
 
-    throw new Error("Not implemented");
+    if (this.size === 0) return View.create(newShape);
+    // Edge case: if the new shape is empty, the size is 1. If that element is
+    // masked out in the original array, then we can't mask it in the new array
+    // because there's no dimension to mask by.
+    if (newShape.length === 0 && this.mask?.some(([b, e]) => b === e))
+      return null;
+
+    if (this.contiguous) return View.create(newShape); // easy case
+
+    // Now for the tricky part: We have to compute the new strides and mask in
+    // the reshaped array. To do this, first we merge dimensions.
+    const rStrides: number[] = [];
+    const merge = mergeDims(this.shape, this.strides, this.mask);
+    let rShapeIdx = newShape.length; // reverse iterator
+    for (let i = merge.length - 1; i >= 0; i--) {
+      let [mergedSize, newStride, realSize] = merge[i];
+      let acc = 1; // how much size we've accumulated for this chunk so far
+      while (acc < mergedSize && rShapeIdx > 0) {
+        const newDim = newShape[--rShapeIdx];
+        rStrides.push(newStride * acc);
+        acc *= newDim;
+        if (acc >= realSize) newStride = 0; // Can't make it, give up.
+      }
+      if (acc !== mergedSize) return null; // Not divisible, give up.
+    }
+
+    // If we didn't make it through, just fill in the rest with zeros. It won't
+    // work, but we can just continue onto the View.create() step.
+    const newStrides = rep(newShape.length - rStrides.length, 0).concat(
+      rStrides.reverse(),
+    );
+    if (!this.mask) return View.create(newShape, newStrides, this.offset);
+
+    // Okay, now we gotta compute the new mask and offset — but then we're done!
+    const newMask = reshapeMask(this.mask, this.shape, newShape);
+    if (!newMask) return null;
+
+    // Since the mask changed, we also have to adjust the offset.
+    let newOffset = this.offset;
+    for (let i = 0; i < this.ndim; i++)
+      newOffset += this.strides[i] * this.mask[i][0];
+    for (let i = 0; i < newShape.length; i++)
+      newOffset -= newStrides[i] * newMask[i][0];
+    return View.create(newShape, newStrides, newOffset, newMask);
   }
 }
 
