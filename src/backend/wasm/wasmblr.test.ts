@@ -10,7 +10,7 @@ suite("CodeGenerator", () => {
       cg.local.get(1);
       cg.f32.add();
     });
-    cg.export_(addFunc, "add");
+    cg.export(addFunc, "add");
 
     const wasmBytes = cg.finish();
     const { instance } = await WebAssembly.instantiate(wasmBytes);
@@ -25,17 +25,17 @@ suite("CodeGenerator", () => {
 
     const factorialFunc = cg.function([cg.f32], [cg.f32], () => {
       cg.local.get(0);
-      cg.f32.const_(1.0);
+      cg.f32.const(1.0);
       cg.f32.lt();
-      cg.if_(cg.f32); // base case
+      cg.if(cg.f32); // base case
       {
-        cg.f32.const_(1.0);
+        cg.f32.const(1.0);
       }
-      cg.else_();
+      cg.else();
       {
         cg.local.get(0);
         cg.local.get(0);
-        cg.f32.const_(1.0);
+        cg.f32.const(1.0);
         cg.f32.sub();
         cg.call(factorialFunc);
         cg.f32.mul();
@@ -43,7 +43,7 @@ suite("CodeGenerator", () => {
       cg.end();
     });
 
-    cg.export_(factorialFunc, "factorial");
+    cg.export(factorialFunc, "factorial");
 
     const wasmBytes = cg.finish();
     const { instance } = await WebAssembly.instantiate(wasmBytes);

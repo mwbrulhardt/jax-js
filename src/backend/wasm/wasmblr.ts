@@ -3,14 +3,14 @@
  * bytecode directly from the browser.
  *
  * Self-contained port of https://github.com/bwasti/wasmblr to TypeScript.
- * Functions and variables in this module are written in `snake_case` to match
- * the names of WebAssembly operations.
+ * Some operation names in this module are written in `snake_case` to match
+ * their names in the Wasm specification.
  *
  * Reference: https://pengowray.github.io/wasm-ops/.
  */
 
-const magic_module_header = [0x00, 0x61, 0x73, 0x6d];
-const module_version = [0x01, 0x00, 0x00, 0x00];
+const magicModuleHeader = [0x00, 0x61, 0x73, 0x6d];
+const moduleVersion = [0x01, 0x00, 0x00, 0x00];
 
 function assert(condition: boolean, message?: string): asserts condition {
   if (!condition) {
@@ -19,7 +19,7 @@ function assert(condition: boolean, message?: string): asserts condition {
 }
 
 // From LLVM
-function encode_signed(n: number): number[] {
+function encodeSigned(n: number): number[] {
   const out: number[] = [];
   let more = true;
   while (more) {
@@ -35,7 +35,7 @@ function encode_signed(n: number): number[] {
   return out;
 }
 
-function encode_unsigned(n: number): number[] {
+function encodeUnsigned(n: number): number[] {
   const out: number[] = [];
   do {
     let byte = n & 0x7f;
@@ -48,7 +48,7 @@ function encode_unsigned(n: number): number[] {
   return out;
 }
 
-function encode_string(s: string): number[] {
+function encodeString(s: string): number[] {
   const bytes = new TextEncoder().encode(s);
   return [bytes.length, ...bytes];
 }
@@ -58,13 +58,13 @@ function concat(out: number[], inp: number[]): void {
 }
 
 class Function_ {
-  input_types: Type[];
-  output_types: Type[];
+  inputTypes: Type[];
+  outputTypes: Type[];
   body: () => void;
   locals: Type[] = [];
-  constructor(input_types: Type[], output_types: Type[], body?: () => void) {
-    this.input_types = input_types;
-    this.output_types = output_types;
+  constructor(inputTypes: Type[], outputTypes: Type[], body?: () => void) {
+    this.inputTypes = inputTypes;
+    this.outputTypes = outputTypes;
     this.body = body || (() => {});
   }
   emit() {
@@ -76,9 +76,9 @@ class Function_ {
 class Memory {
   min = 0;
   max = 0;
-  is_shared = false;
-  a_string = "";
-  b_string = "";
+  isShared = false;
+  aString = "";
+  bString = "";
 
   constructor(readonly cg: CodeGenerator) {}
 
@@ -89,21 +89,21 @@ class Memory {
     return this;
   }
 
-  export_(a: string): this {
-    assert(!this.is_import && !this.is_export, "already set");
-    this.a_string = a;
+  export(a: string): this {
+    assert(!this.isImport && !this.isExport, "already set");
+    this.aString = a;
     return this;
   }
 
-  shared(make_shared: boolean): this {
-    this.is_shared = make_shared;
+  shared(isShared: boolean): this {
+    this.isShared = isShared;
     return this;
   }
 
-  import_(a: string, b: string): this {
-    assert(!this.is_import && !this.is_export, "already set");
-    this.a_string = a;
-    this.b_string = b;
+  import(a: string, b: string): this {
+    assert(!this.isImport && !this.isExport, "already set");
+    this.aString = a;
+    this.bString = b;
     return this;
   }
 
@@ -117,11 +117,11 @@ class Memory {
     this.cg.emit(0x00);
   }
 
-  get is_import(): boolean {
-    return this.a_string.length > 0 && this.b_string.length > 0;
+  get isImport(): boolean {
+    return this.aString.length > 0 && this.bString.length > 0;
   }
-  get is_export(): boolean {
-    return this.a_string.length > 0 && this.b_string.length === 0;
+  get isExport(): boolean {
+    return this.aString.length > 0 && this.bString.length === 0;
   }
 }
 
@@ -146,10 +146,10 @@ export class CodeGenerator {
   void_ = { typeId: 0x40 };
 
   functions: Function_[] = [];
-  exported_functions = new Map<number, string>();
-  cur_function: Function_ | null = null;
-  cur_bytes: number[] = [];
-  type_stack: Type[] = [];
+  exportedFunctions = new Map<number, string>();
+  curFunction: Function_ | null = null;
+  curBytes: number[] = [];
+  typeStack: Type[] = [];
 
   constructor() {
     this.local = new Local(this);
@@ -173,211 +173,207 @@ export class CodeGenerator {
     this.emit(0x03);
     this.emit(type.typeId);
   }
-  if_(type: Type) {
+  if(type: Type) {
     assert(this.pop().typeId === this.i32.typeId, "if_: expected i32");
     this.emit(0x04);
     this.emit(type.typeId);
   }
-  else_() {
+  else() {
     this.emit(0x05);
   }
   br(labelidx: number) {
     this.emit(0x0c);
-    this.emit(encode_unsigned(labelidx));
+    this.emit(encodeUnsigned(labelidx));
   }
   br_if(labelidx: number) {
     assert(this.pop().typeId === this.i32.typeId, "br_if: expected i32");
     this.emit(0x0d);
-    this.emit(encode_unsigned(labelidx));
+    this.emit(encodeUnsigned(labelidx));
   }
   end() {
     this.emit(0x0b);
   }
-  call(fn_idx: number) {
-    assert(fn_idx < this.functions.length, "function index does not exist");
+  call(fn: number) {
+    assert(fn < this.functions.length, "function index does not exist");
     this.emit(0x10);
-    this.emit(encode_unsigned(fn_idx));
+    this.emit(encodeUnsigned(fn));
   }
 
-  // Export a function.
-  export_(fn: number, name: string) {
-    this.exported_functions.set(fn, name);
+  /** Export a function. */
+  export(fn: number, name: string) {
+    this.exportedFunctions.set(fn, name);
   }
 
-  // Declare a new function; returns its index.
-  function(
-    input_types: Type[],
-    output_types: Type[],
-    body: () => void,
-  ): number {
+  /** Declare a new function; returns its index. */
+  function(inputTypes: Type[], outputTypes: Type[], body: () => void): number {
     const idx = this.functions.length;
-    this.functions.push(new Function_(input_types, output_types, body));
+    this.functions.push(new Function_(inputTypes, outputTypes, body));
     return idx;
   }
 
   // --- Implementation helpers
 
-  declare_local(type: Type): number {
-    assert(this.cur_function !== null, "No current function");
+  declareLocal(type: Type): number {
+    assert(this.curFunction !== null, "No current function");
     const idx =
-      this.cur_function.locals.length + this.cur_function.input_types.length;
-    this.cur_function.locals.push(type);
+      this.curFunction.locals.length + this.curFunction.inputTypes.length;
+    this.curFunction.locals.push(type);
     return idx;
   }
 
-  input_types(): Type[] {
-    assert(this.cur_function !== null, "No current function");
-    return this.cur_function.input_types;
+  inputTypes(): Type[] {
+    assert(this.curFunction !== null, "No current function");
+    return this.curFunction.inputTypes;
   }
 
   locals(): Type[] {
-    assert(this.cur_function !== null, "No current function");
-    return this.cur_function.locals;
+    assert(this.curFunction !== null, "No current function");
+    return this.curFunction.locals;
   }
 
   push(type: Type) {
-    this.type_stack.push(type);
+    this.typeStack.push(type);
   }
   pop(): Type {
-    assert(this.type_stack.length > 0, "popping empty stack");
-    return this.type_stack.pop()!;
+    assert(this.typeStack.length > 0, "popping empty stack");
+    return this.typeStack.pop()!;
   }
 
   emit(bytes: number | number[]) {
-    if (typeof bytes === "number") this.cur_bytes.push(bytes);
-    else this.cur_bytes.push(...bytes);
+    if (typeof bytes === "number") this.curBytes.push(bytes);
+    else this.curBytes.push(...bytes);
   }
 
   // Emit the complete module as an array of bytes.
   finish(): Uint8Array {
-    this.cur_bytes = [];
-    let emitted_bytes: number[] = [];
-    concat(emitted_bytes, magic_module_header);
-    concat(emitted_bytes, module_version);
+    this.curBytes = [];
+    let emittedBytes: number[] = [];
+    concat(emittedBytes, magicModuleHeader);
+    concat(emittedBytes, moduleVersion);
 
     // Type section
-    let type_section_bytes: number[] = [];
-    concat(type_section_bytes, encode_unsigned(this.functions.length));
+    let typeSectionBytes: number[] = [];
+    concat(typeSectionBytes, encodeUnsigned(this.functions.length));
     for (const f of this.functions) {
-      type_section_bytes.push(0x60);
-      concat(type_section_bytes, encode_unsigned(f.input_types.length));
-      for (const t of f.input_types) {
-        type_section_bytes.push(t.typeId);
+      typeSectionBytes.push(0x60);
+      concat(typeSectionBytes, encodeUnsigned(f.inputTypes.length));
+      for (const t of f.inputTypes) {
+        typeSectionBytes.push(t.typeId);
       }
-      concat(type_section_bytes, encode_unsigned(f.output_types.length));
-      for (const t of f.output_types) {
-        type_section_bytes.push(t.typeId);
+      concat(typeSectionBytes, encodeUnsigned(f.outputTypes.length));
+      for (const t of f.outputTypes) {
+        typeSectionBytes.push(t.typeId);
       }
     }
-    emitted_bytes.push(0x01);
-    concat(emitted_bytes, encode_unsigned(type_section_bytes.length));
-    concat(emitted_bytes, type_section_bytes);
+    emittedBytes.push(0x01);
+    concat(emittedBytes, encodeUnsigned(typeSectionBytes.length));
+    concat(emittedBytes, typeSectionBytes);
 
     // Import section (for memory import)
-    let import_section_bytes: number[] = [];
-    if (this.memory.is_import) {
+    let importSectionBytes: number[] = [];
+    if (this.memory.isImport) {
       // one import
-      concat(import_section_bytes, encode_unsigned(1));
-      concat(import_section_bytes, encode_string(this.memory.a_string));
-      concat(import_section_bytes, encode_string(this.memory.b_string));
-      import_section_bytes.push(0x02); // memory flag
+      concat(importSectionBytes, encodeUnsigned(1));
+      concat(importSectionBytes, encodeString(this.memory.aString));
+      concat(importSectionBytes, encodeString(this.memory.bString));
+      importSectionBytes.push(0x02); // memory flag
       if (this.memory.min && this.memory.max) {
-        if (this.memory.is_shared) {
-          import_section_bytes.push(0x03);
+        if (this.memory.isShared) {
+          importSectionBytes.push(0x03);
         } else {
-          import_section_bytes.push(0x01);
+          importSectionBytes.push(0x01);
         }
-        concat(import_section_bytes, encode_unsigned(this.memory.min));
-        concat(import_section_bytes, encode_unsigned(this.memory.max));
+        concat(importSectionBytes, encodeUnsigned(this.memory.min));
+        concat(importSectionBytes, encodeUnsigned(this.memory.max));
       } else {
-        assert(!this.memory.is_shared, "shared memory must have a max size");
-        concat(import_section_bytes, encode_unsigned(this.memory.min));
+        assert(!this.memory.isShared, "shared memory must have a max size");
+        concat(importSectionBytes, encodeUnsigned(this.memory.min));
       }
-      emitted_bytes.push(0x02);
-      concat(emitted_bytes, encode_unsigned(import_section_bytes.length));
-      concat(emitted_bytes, import_section_bytes);
+      emittedBytes.push(0x02);
+      concat(emittedBytes, encodeUnsigned(importSectionBytes.length));
+      concat(emittedBytes, importSectionBytes);
     }
 
     // Function section
-    let function_section_bytes: number[] = [];
-    concat(function_section_bytes, encode_unsigned(this.functions.length));
+    let functionSectionBytes: number[] = [];
+    concat(functionSectionBytes, encodeUnsigned(this.functions.length));
     for (let i = 0; i < this.functions.length; i++) {
-      concat(function_section_bytes, encode_unsigned(i));
+      concat(functionSectionBytes, encodeUnsigned(i));
     }
-    emitted_bytes.push(0x03);
-    concat(emitted_bytes, encode_unsigned(function_section_bytes.length));
-    concat(emitted_bytes, function_section_bytes);
+    emittedBytes.push(0x03);
+    concat(emittedBytes, encodeUnsigned(functionSectionBytes.length));
+    concat(emittedBytes, functionSectionBytes);
 
     // Memory section (if defined locally)
-    let memory_section_bytes: number[] = [];
-    if (!this.memory.is_import && (this.memory.min || this.memory.max)) {
-      memory_section_bytes.push(0x01); // always one memory
+    let memorySectionBytes: number[] = [];
+    if (!this.memory.isImport && (this.memory.min || this.memory.max)) {
+      memorySectionBytes.push(0x01); // always one memory
       if (this.memory.min && this.memory.max) {
-        if (this.memory.is_shared) {
-          memory_section_bytes.push(0x03);
+        if (this.memory.isShared) {
+          memorySectionBytes.push(0x03);
         } else {
-          memory_section_bytes.push(0x01);
+          memorySectionBytes.push(0x01);
         }
-        concat(memory_section_bytes, encode_unsigned(this.memory.min));
-        concat(memory_section_bytes, encode_unsigned(this.memory.max));
+        concat(memorySectionBytes, encodeUnsigned(this.memory.min));
+        concat(memorySectionBytes, encodeUnsigned(this.memory.max));
       } else {
-        assert(!this.memory.is_shared, "shared memory must have a max size");
-        memory_section_bytes.push(0x00);
-        concat(memory_section_bytes, encode_unsigned(this.memory.min));
+        assert(!this.memory.isShared, "shared memory must have a max size");
+        memorySectionBytes.push(0x00);
+        concat(memorySectionBytes, encodeUnsigned(this.memory.min));
       }
-      emitted_bytes.push(0x05);
-      concat(emitted_bytes, encode_unsigned(memory_section_bytes.length));
-      concat(emitted_bytes, memory_section_bytes);
+      emittedBytes.push(0x05);
+      concat(emittedBytes, encodeUnsigned(memorySectionBytes.length));
+      concat(emittedBytes, memorySectionBytes);
     }
 
     // Export section
-    let export_section_bytes: number[] = [];
-    const num_exports =
-      this.exported_functions.size + (this.memory.is_export ? 1 : 0);
-    concat(export_section_bytes, encode_unsigned(num_exports));
-    if (this.memory.is_export) {
-      concat(export_section_bytes, encode_string(this.memory.a_string));
-      export_section_bytes.push(0x02);
-      export_section_bytes.push(0x00); // one memory at index 0
+    let exportSectionBytes: number[] = [];
+    const numExports =
+      this.exportedFunctions.size + (this.memory.isExport ? 1 : 0);
+    concat(exportSectionBytes, encodeUnsigned(numExports));
+    if (this.memory.isExport) {
+      concat(exportSectionBytes, encodeString(this.memory.aString));
+      exportSectionBytes.push(0x02);
+      exportSectionBytes.push(0x00); // one memory at index 0
     }
-    for (const [key, name] of this.exported_functions.entries()) {
-      concat(export_section_bytes, encode_string(name));
-      export_section_bytes.push(0x00);
-      concat(export_section_bytes, encode_unsigned(key));
+    for (const [key, name] of this.exportedFunctions.entries()) {
+      concat(exportSectionBytes, encodeString(name));
+      exportSectionBytes.push(0x00);
+      concat(exportSectionBytes, encodeUnsigned(key));
     }
-    emitted_bytes.push(0x07);
-    concat(emitted_bytes, encode_unsigned(export_section_bytes.length));
-    concat(emitted_bytes, export_section_bytes);
+    emittedBytes.push(0x07);
+    concat(emittedBytes, encodeUnsigned(exportSectionBytes.length));
+    concat(emittedBytes, exportSectionBytes);
 
     // Code section
-    let code_section_bytes: number[] = [];
-    concat(code_section_bytes, encode_unsigned(this.functions.length));
+    let codeSectionBytes: number[] = [];
+    concat(codeSectionBytes, encodeUnsigned(this.functions.length));
     for (const f of this.functions) {
-      this.cur_function = f;
-      this.cur_bytes = [];
+      this.curFunction = f;
+      this.curBytes = [];
       f.emit();
       this.end();
-      const body_bytes = [...this.cur_bytes];
-      this.cur_bytes = [];
+      const bodyBytes = [...this.curBytes];
+      this.curBytes = [];
       // Header: local declarations
-      concat(this.cur_bytes, encode_unsigned(f.locals.length));
+      concat(this.curBytes, encodeUnsigned(f.locals.length));
       for (const l of f.locals) {
         this.emit(0x01);
         this.emit(l.typeId);
       }
-      const header_bytes = [...this.cur_bytes];
-      const fn_size = header_bytes.length + body_bytes.length;
-      concat(code_section_bytes, encode_unsigned(fn_size));
-      concat(code_section_bytes, header_bytes);
-      concat(code_section_bytes, body_bytes);
+      const headerBytes = [...this.curBytes];
+      const fnSize = headerBytes.length + bodyBytes.length;
+      concat(codeSectionBytes, encodeUnsigned(fnSize));
+      concat(codeSectionBytes, headerBytes);
+      concat(codeSectionBytes, bodyBytes);
     }
-    this.cur_function = null;
+    this.curFunction = null;
 
-    emitted_bytes.push(0x0a);
-    concat(emitted_bytes, encode_unsigned(code_section_bytes.length));
-    concat(emitted_bytes, code_section_bytes);
+    emittedBytes.push(0x0a);
+    concat(emittedBytes, encodeUnsigned(codeSectionBytes.length));
+    concat(emittedBytes, codeSectionBytes);
 
-    return new Uint8Array(emitted_bytes);
+    return new Uint8Array(emittedBytes);
   }
 }
 
@@ -390,109 +386,103 @@ class Local {
 
   // Mimic operator()(type)
   declare(type: Type): number {
-    return this.cg.declare_local(type);
+    return this.cg.declareLocal(type);
   }
   get(idx: number) {
-    const input_types = this.cg.input_types();
-    if (idx < input_types.length) {
-      this.cg.push(input_types[idx]);
+    const inputTypes = this.cg.inputTypes();
+    if (idx < inputTypes.length) {
+      this.cg.push(inputTypes[idx]);
     } else {
-      this.cg.push(this.cg.locals()[idx - input_types.length]);
+      this.cg.push(this.cg.locals()[idx - inputTypes.length]);
     }
     this.cg.emit(0x20);
-    this.cg.emit(encode_unsigned(idx));
+    this.cg.emit(encodeUnsigned(idx));
   }
   set(idx: number) {
     const t = this.cg.pop();
-    const input_types = this.cg.input_types();
-    const expected_type =
-      idx < input_types.length
-        ? input_types[idx]
-        : this.cg.locals()[idx - input_types.length];
+    const inputTypes = this.cg.inputTypes();
+    const expectedType =
+      idx < inputTypes.length
+        ? inputTypes[idx]
+        : this.cg.locals()[idx - inputTypes.length];
     assert(
-      expected_type.typeId === t.typeId,
+      expectedType.typeId === t.typeId,
       "can't set local to this value (wrong type)",
     );
     this.cg.emit(0x21);
-    this.cg.emit(encode_unsigned(idx));
+    this.cg.emit(encodeUnsigned(idx));
   }
   tee(idx: number) {
     const t = this.cg.pop();
-    const input_types = this.cg.input_types();
-    const expected_type =
-      idx < input_types.length
-        ? input_types[idx]
-        : this.cg.locals()[idx - input_types.length];
+    const inputTypes = this.cg.inputTypes();
+    const expectedType =
+      idx < inputTypes.length
+        ? inputTypes[idx]
+        : this.cg.locals()[idx - inputTypes.length];
     assert(
-      expected_type.typeId === t.typeId,
+      expectedType.typeId === t.typeId,
       "can't tee local to this value (wrong type)",
     );
     this.cg.emit(0x22);
-    this.cg.emit(encode_unsigned(idx));
-    this.cg.push(expected_type);
+    this.cg.emit(encodeUnsigned(idx));
+    this.cg.push(expectedType);
   }
 }
 
-function UNARY_OP(
-  op: string,
-  opcode: number,
-  in_type: string,
-  out_type: string,
-) {
+function UNARY_OP(op: string, opcode: number, inType: string, outType: string) {
   return function (this: any) {
     const t = this.cg.pop();
     assert(
-      t.typeId === this.cg[in_type].typeId,
-      `invalid type for ${op} (${in_type} -> ${out_type})`,
+      t.typeId === this.cg[inType].typeId,
+      `invalid type for ${op} (${inType} -> ${outType})`,
     );
     this.cg.emit(opcode);
-    this.cg.push(this.cg[out_type]);
+    this.cg.push(this.cg[outType]);
   };
 }
 
 function BINARY_OP(
   op: string,
   opcode: number,
-  type_a: string,
-  type_b: string,
-  out_type: string,
+  typeA: string,
+  typeB: string,
+  outType: string,
 ) {
   return function (this: any) {
     const b = this.cg.pop();
     const a = this.cg.pop();
     assert(
-      a.typeId === this.cg[type_a].typeId &&
-        b.typeId === this.cg[type_b].typeId,
-      `invalid type for ${op} (${type_a}, ${type_b} -> ${out_type})`,
+      a.typeId === this.cg[typeA].typeId && b.typeId === this.cg[typeB].typeId,
+      `invalid type for ${op} (${typeA}, ${typeB} -> ${outType})`,
     );
     this.cg.emit(opcode);
-    this.cg.push(this.cg[out_type]);
+    this.cg.push(this.cg[outType]);
   };
 }
 
-function LOAD_OP(op: string, opcode: number, out_type: string) {
+function LOAD_OP(op: string, opcode: number, outType: string) {
   return function (this: any, alignment: number = 1, offset: number = 0) {
-    const idx_type = this.cg.pop();
-    assert(idx_type.typeId === this.cg.i32.typeId, `invalid type for ${op}`);
+    const idxType = this.cg.pop();
+    assert(idxType.typeId === this.cg.i32.typeId, `invalid type for ${op}`);
     this.cg.emit(opcode);
-    this.cg.emit(encode_unsigned(alignment));
-    this.cg.emit(encode_unsigned(offset));
-    this.cg.push(this.cg[out_type]);
+    this.cg.emit(encodeUnsigned(alignment));
+    this.cg.emit(encodeUnsigned(offset));
+    this.cg.push(this.cg[outType]);
   };
 }
 
-function STORE_OP(op: string, opcode: number, in_type: string) {
+function STORE_OP(op: string, opcode: number, inType: string) {
   return function (this: any, alignment: number = 1, offset: number = 0) {
-    const val_type = this.cg.pop();
-    const idx_type = this.cg.pop();
+    const valType = this.cg.pop();
+    const idxType = this.cg.pop();
     assert(
-      val_type.typeId === this.cg[in_type].typeId,
-      `invalid value type for ${op} (${in_type})`,
+      valType.typeId === this.cg[inType].typeId,
+      `invalid value type for ${op} (${inType})`,
     );
-    assert(idx_type.typeId === this.cg.i32.typeId, `invalid type for ${op}`);
+    assert(idxType.typeId === this.cg.i32.typeId, `invalid type for ${op}`);
     this.cg.emit(opcode);
-    this.cg.emit(encode_unsigned(alignment));
-    this.cg.emit(encode_unsigned(offset));
+    this.cg.emit(encodeUnsigned(alignment));
+    this.cg.emit(encodeUnsigned(offset));
   };
 }
 
@@ -506,9 +496,9 @@ class I32 {
     return 0x7f;
   }
 
-  const_(i: number) {
+  const(i: number) {
     this.cg.emit(0x41);
-    this.cg.emit(encode_signed(i));
+    this.cg.emit(encodeSigned(i));
     this.cg.push(this);
   }
   clz = UNARY_OP("clz", 0x67, "i32", "i32");
@@ -560,7 +550,7 @@ class F32 {
     return 0x7d;
   }
 
-  const_(f: number) {
+  const(f: number) {
     this.cg.emit(0x43);
     const buffer = new ArrayBuffer(4);
     new DataView(buffer).setFloat32(0, f, true);
@@ -595,23 +585,27 @@ class F32 {
   store = STORE_OP("store", 0x38, "f32");
 }
 
+////////////////////////////////////////
+// Vector types (SIMD)
+////////////////////////////////////////
+
 function VECTOR_OP(
   op: string,
   vopcode: number,
-  in_types: string[],
-  out_type: string,
+  inTypes: string[],
+  outType: string,
 ) {
   return function (this: any) {
-    for (const in_type of in_types) {
-      const actual_type = this.cg.pop();
+    for (const inType of inTypes) {
+      const actualType = this.cg.pop();
       assert(
-        actual_type.typeId === this.cg[in_type].typeId,
-        `invalid type for ${op} (${in_types} -> ${out_type})`,
+        actualType.typeId === this.cg[inType].typeId,
+        `invalid type for ${op} (${inTypes} -> ${outType})`,
       );
     }
     this.cg.emit(0xfd);
-    this.cg.emit(encode_unsigned(vopcode));
-    this.cg.push(this.cg[out_type]);
+    this.cg.emit(encodeUnsigned(vopcode));
+    this.cg.push(this.cg[outType]);
   };
 }
 
@@ -619,32 +613,32 @@ function VECTOR_OP(
 function VECTOR_OPL(
   op: string,
   vopcode: number,
-  in_types: string[],
-  out_type: string,
+  inTypes: string[],
+  outType: string,
 ) {
   return function (this: any, lane: number) {
-    for (const in_type of in_types) {
-      const actual_type = this.cg.pop();
+    for (const inType of inTypes) {
+      const actualType = this.cg.pop();
       assert(
-        actual_type.typeId === this.cg[in_type].typeId,
-        `invalid type for ${op} (${in_types} -> ${out_type})`,
+        actualType.typeId === this.cg[inType].typeId,
+        `invalid type for ${op} (${inTypes} -> ${outType})`,
       );
     }
     this.cg.emit(0xfd);
-    this.cg.emit(encode_unsigned(vopcode));
+    this.cg.emit(encodeUnsigned(vopcode));
     this.cg.emit(lane); // 1 byte
-    this.cg.push(this.cg[out_type]);
+    this.cg.push(this.cg[outType]);
   };
 }
 
 function VECTOR_LOAD_OP(op: string, vopcode: number) {
   return function (this: any, alignment: number = 1, offset: number = 0) {
-    const idx_type = this.cg.pop();
-    assert(idx_type.typeId === this.cg.i32.typeId, `invalid type for ${op}`);
+    const idxType = this.cg.pop();
+    assert(idxType.typeId === this.cg.i32.typeId, `invalid type for ${op}`);
     this.cg.emit(0xfd);
-    this.cg.emit(encode_unsigned(vopcode));
-    this.cg.emit(encode_unsigned(alignment));
-    this.cg.emit(encode_unsigned(offset));
+    this.cg.emit(encodeUnsigned(vopcode));
+    this.cg.emit(encodeUnsigned(alignment));
+    this.cg.emit(encodeUnsigned(offset));
     this.cg.push(this.cg.v128);
   };
 }
@@ -662,14 +656,14 @@ class V128 {
   load32_zero = VECTOR_LOAD_OP("load32_zero", 0x5c);
 
   store(alignment: number = 1, offset: number = 0) {
-    const val_type = this.cg.pop();
-    assert(val_type.typeId === this.cg.v128.typeId, `invalid type for store`);
-    const idx_type = this.cg.pop();
-    assert(idx_type.typeId === this.cg.i32.typeId, `invalid type for store`);
+    const valType = this.cg.pop();
+    assert(valType.typeId === this.cg.v128.typeId, `invalid type for store`);
+    const idxType = this.cg.pop();
+    assert(idxType.typeId === this.cg.i32.typeId, `invalid type for store`);
     this.cg.emit(0xfd);
-    this.cg.emit(encode_unsigned(0x0b));
-    this.cg.emit(encode_unsigned(alignment));
-    this.cg.emit(encode_unsigned(offset));
+    this.cg.emit(encodeUnsigned(0x0b));
+    this.cg.emit(encodeUnsigned(alignment));
+    this.cg.emit(encodeUnsigned(offset));
   }
 
   not = VECTOR_OP("not", 0x4d, ["v128"], "v128");
