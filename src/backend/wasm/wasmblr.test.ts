@@ -107,11 +107,7 @@ suite("CodeGenerator", () => {
     cg.export(vectorSumFunc, "vectorSum");
 
     const wasmBytes = cg.finish();
-    const { instance } = await WebAssembly.instantiate(wasmBytes, {
-      env: {
-        memory: new WebAssembly.Memory({ initial: 1 }),
-      },
-    });
+    const { instance } = await WebAssembly.instantiate(wasmBytes);
 
     const { memory, vectorSum } = instance.exports as {
       memory: WebAssembly.Memory;
