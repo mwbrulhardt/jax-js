@@ -1,25 +1,6 @@
 import { expect, suite, test } from "vitest";
 import { numpy as np, jvp, jacfwd, vmap } from "@jax-js/core";
 
-// test("has webgpu", async () => {
-//   const adapter = await navigator.gpu?.requestAdapter();
-//   const device = await adapter?.requestDevice();
-//   if (!adapter || !device) {
-//     throw new Error("No adapter or device");
-//   }
-//   console.log(device.adapterInfo.architecture);
-//   console.log(device.adapterInfo.vendor);
-//   console.log(adapter.limits.maxVertexBufferArrayStride);
-// });
-
-/** Take the derivative of a simple function. */
-function deriv(f: (x: np.Array) => np.Array): (x: np.ArrayLike) => np.Array {
-  return (x) => {
-    const [_y, dy] = jvp(f, [x], [1.0]);
-    return dy;
-  };
-}
-
 test("can create array", () => {
   const x = np.array([1, 2, 3]);
   expect(x.js()).toEqual([1, 2, 3]);
@@ -27,6 +8,13 @@ test("can create array", () => {
 
 suite("jax.jvp()", () => {
   test("can take scalar derivatives", () => {
+    /** Take the derivative of a simple function. */
+    const deriv: (
+      f: (x: np.Array) => np.Array,
+    ) => (x: np.ArrayLike) => np.Array = (f) => (x) => {
+      const [_y, dy] = jvp(f, [x], [1.0]);
+      return dy;
+    };
     const x = 3.0;
     expect(np.sin(x)).toBeAllclose(0.141120001);
     expect(deriv(np.sin)(x)).toBeAllclose(-0.989992499);

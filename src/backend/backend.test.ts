@@ -5,9 +5,10 @@ import { AluExp, DType } from "../alu";
 import { range } from "../utils";
 
 const backends: BackendType[] = ["cpu", "webgpu"];
-await init(...backends);
 
-describe.each(backends)("Backend '%s'", (backendType) => {
+describe.each(backends)("Backend '%s'", async (backendType) => {
+  await init(backendType);
+
   test("can run simple operations", async ({ skip }) => {
     const backend = getBackend(backendType);
     if (!backend) return skip();

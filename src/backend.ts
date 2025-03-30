@@ -112,6 +112,15 @@ export interface Backend {
   dispatch(exe: Executable<any>, inputs: Slot[], outputs: Slot[]): void;
 }
 
+export class Executable<T> {
+  constructor(
+    readonly nargs: number,
+    readonly exp: AluExp,
+    /** Backends store extra data here, and it's only used by that backend. */
+    readonly data: T,
+  ) {}
+}
+
 export class SlotError extends Error {
   constructor(slot: Slot) {
     super(`Used a buffer that is invalid or already freed: ${slot}`);
