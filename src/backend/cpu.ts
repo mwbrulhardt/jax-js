@@ -1,4 +1,4 @@
-import { AluExp } from "../alu";
+import { AluExp, Kernel } from "../alu";
 import { Backend, BackendType, Executable, Slot, SlotError } from "../backend";
 
 /** Most basic implementation of `Backend` for testing. */
@@ -53,16 +53,16 @@ export class CPUBackend implements Backend {
     return buffer.slice(start, start + count);
   }
 
-  async prepare(nargs: number, exp: AluExp): Promise<Executable<void>> {
-    return this.prepareSync(nargs, exp);
+  async prepare(kernel: Kernel): Promise<Executable<void>> {
+    return this.prepareSync(kernel);
   }
 
-  prepareSync(nargs: number, exp: AluExp): Executable<void> {
-    return new Executable(nargs, exp, undefined);
+  prepareSync(kernel: Kernel): Executable<void> {
+    return new Executable(kernel, undefined);
   }
 
   dispatch(exe: Executable<void>, inputs: Slot[], outputs: Slot[]): void {
-    const exp = exe.exp.simplify();
+    const exp = exe.kernel.exp.simplify();
     const inputBuffers = inputs.map((slot) => this.#getBuffer(slot));
     const outputBuffers = outputs.map((slot) => this.#getBuffer(slot));
 
@@ -70,7 +70,7 @@ export class CPUBackend implements Backend {
     const outputArray = new Float32Array(outputBuffers[0]);
 
     const globals = (gidx: number, bufidx: number) => inputArrays[gidx][bufidx];
-    for (let i = 0; i < outputArray.length; i++) {
+    for (let i = 0; i < exe.kernel.size; i++) {
       outputArray[i] = exp.evaluate({ gidx: i }, globals);
     }
   }

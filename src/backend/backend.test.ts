@@ -1,7 +1,7 @@
 import { describe, expect, test as globalTest } from "vitest";
 import { accessorGlobal, backendTypes, getBackend, init } from "../backend";
 import { ShapeTracker } from "../shape";
-import { AluExp, DType } from "../alu";
+import { AluExp, DType, Kernel } from "../alu";
 import { range } from "../utils";
 
 const backendsAvailable = await init(...backendTypes);
@@ -23,13 +23,17 @@ describe.each(backendTypes)("Backend '%s'", (backendType) => {
       const arg1 = accessorGlobal(0, shape, gidx);
       const arg2 = accessorGlobal(1, shape.flip([true]), gidx);
 
-      const exe1 = await backend.prepare(2, AluExp.mul(arg1, arg2));
+      const exe1 = await backend.prepare(
+        new Kernel(2, 3, AluExp.mul(arg1, arg2)),
+      );
       backend.dispatch(exe1, [a, b], [c]);
 
       const buf = await backend.read(c);
       expect(new Float32Array(buf)).toEqual(new Float32Array([6, 10, 12]));
 
-      const exe2 = await backend.prepare(2, AluExp.add(arg1, arg2));
+      const exe2 = await backend.prepare(
+        new Kernel(2, 3, AluExp.add(arg1, arg2)),
+      );
       backend.dispatch(exe2, [a, b], [c]);
       const buf2 = await backend.read(c);
       expect(new Float32Array(buf2)).toEqual(new Float32Array([7, 7, 7]));
@@ -45,7 +49,9 @@ describe.each(backendTypes)("Backend '%s'", (backendType) => {
     const a = backend.malloc(200 * 4);
     try {
       const gidx = AluExp.special(DType.Int32, "gidx", 200);
-      const exe = await backend.prepare(0, AluExp.cast(DType.Float32, gidx));
+      const exe = await backend.prepare(
+        new Kernel(0, 200, AluExp.cast(DType.Float32, gidx)),
+      );
       backend.dispatch(exe, [], [a]);
       const buf = await backend.read(a);
       expect(new Float32Array(buf)).toEqual(new Float32Array(range(0, 200)));
@@ -59,7 +65,9 @@ describe.each(backendTypes)("Backend '%s'", (backendType) => {
     const a = backend.malloc(4 * 4);
     try {
       const gidx = AluExp.special(DType.Int32, "gidx", 4);
-      const exe = backend.prepareSync(0, AluExp.cast(DType.Float32, gidx));
+      const exe = backend.prepareSync(
+        new Kernel(0, 4, AluExp.cast(DType.Float32, gidx)),
+      );
       backend.dispatch(exe, [], [a]);
       const buf = backend.readSync(a);
       expect(new Float32Array(buf)).toEqual(new Float32Array([0, 1, 2, 3]));

@@ -25,7 +25,7 @@ npm test
   - [ ] Reduction operations
   - [ ] "Group" optimizations
   - [ ] "Unroll" optimizations
-  - [ ] "Upcast" optimizations (i.e., `vec4<f32>`)
+  - [ ] "Upcast" optimizations (i.e., Wasm SIMD)
 - [ ] We figure out the `dispose()` / refcount / linear types stuff
 - [ ] Device switching with `.to()` between webgl/webgpu/cpu/wasm
 - [ ] Demos: Navier-Stokes, neural networks, statistics

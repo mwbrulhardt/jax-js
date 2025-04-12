@@ -9,7 +9,7 @@
  * and dispatch happens on the level of each shader. Buffers are untyped.
  */
 
-import { AluExp, DType } from "./alu";
+import { AluExp, DType, Kernel, Reduction } from "./alu";
 import { ShapeTracker, unravelAlu } from "./shape";
 
 export type BackendType = "cpu" | "webgpu";
@@ -128,10 +128,10 @@ export interface Backend {
   readSync(slot: Slot, start?: number, count?: number): ArrayBuffer;
 
   /** Prepare an expression to be executed later. */
-  prepare(nargs: number, exp: AluExp): Promise<Executable>;
+  prepare(kernel: Kernel): Promise<Executable>;
 
   /** Prepare an expression to be executed later, blocking variant. */
-  prepareSync(nargs: number, exp: AluExp): Executable;
+  prepareSync(kernel: Kernel): Executable;
 
   /**
    * Run a backend operation that was previously prepared.
@@ -145,9 +145,8 @@ export interface Backend {
 
 export class Executable<T = any> {
   constructor(
-    readonly nargs: number,
-    readonly exp: AluExp,
-    /** Backends store extra data here, and it's only used by that backend. */
+    readonly kernel: Kernel,
+    /** Extra data specific to the backend running this kernel. */
     readonly data: T,
   ) {}
 }

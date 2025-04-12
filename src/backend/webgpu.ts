@@ -1,6 +1,11 @@
-import { AluExp, AluGroup, AluOp, DType } from "../alu";
+import { AluExp, AluGroup, AluOp, DType, Kernel } from "../alu";
 import { Backend, BackendType, Executable, Slot, SlotError } from "../backend";
 import { DEBUG } from "../utils";
+
+type ShaderDispatch = {
+  pipeline: GPUComputePipeline;
+  grid: [number, number];
+};
 
 /** Implementation of `Backend` that uses WebGPU in browsers. */
 export class WebGPUBackend implements Backend {
@@ -89,23 +94,20 @@ export class WebGPUBackend implements Backend {
     return this.syncReader.read(buffer, start, count);
   }
 
-  async prepare(
-    nargs: number,
-    exp: AluExp,
-  ): Promise<Executable<GPUComputePipeline>> {
-    const src = pipelineSource(this.device, nargs, exp);
-    const pipeline = await this.pipelines.prepare(src);
-    return new Executable(nargs, exp, pipeline);
+  async prepare(kernel: Kernel): Promise<Executable<ShaderDispatch>> {
+    const { shader, grid } = pipelineSource(this.device, kernel);
+    const pipeline = await this.pipelines.prepare(shader);
+    return new Executable(kernel, { pipeline, grid });
   }
 
-  prepareSync(nargs: number, exp: AluExp): Executable<GPUComputePipeline> {
-    const src = pipelineSource(this.device, nargs, exp);
-    const pipeline = this.pipelines.prepareSync(src);
-    return new Executable(nargs, exp, pipeline);
+  prepareSync(kernel: Kernel): Executable<ShaderDispatch> {
+    const { shader, grid } = pipelineSource(this.device, kernel);
+    const pipeline = this.pipelines.prepareSync(shader);
+    return new Executable(kernel, { pipeline, grid });
   }
 
   dispatch(
-    exe: Executable<GPUComputePipeline>,
+    exe: Executable<ShaderDispatch>,
     inputs: Slot[],
     outputs: Slot[],
   ): void {
@@ -174,38 +176,41 @@ function constToWgsl(dtype: DType, value: any): string {
   throw new Error(`Unsupported const dtype: ${dtype}`);
 }
 
-/** Compiles an expression into WebGPU shader source code. */
-function pipelineSource(device: GPUDevice, nargs: number, exp: AluExp): string {
+/**
+ * Compiles an expression into WebGPU shader source code.
+ *
+ * Returns the shader source and the number of workgroups to dispatch along x
+ * and y axes, to run the kernel.
+ */
+function pipelineSource(
+  device: GPUDevice,
+  kernel: Kernel,
+): { shader: string; grid: [number, number] } {
+  let { exp, nargs } = kernel;
+
   exp = exp.simplify();
   const args = Array.from({ length: nargs }, (_, i) => `in${i}`);
 
-  // binding(0): uniforms
-  // binding(1..n): input buffers
-  // binding(n+1): output buffer
+  // binding(0..n-1): input buffers
+  // binding(n): output buffer
 
-  const kernel: string[] = []; // line-separated
-  kernel.push(
-    "struct Uniforms {",
-    "  len: u32,",
-    "};",
-    "@group(0) @binding(0) var<uniform> uniforms : Uniforms;",
-  );
+  const shader: string[] = []; // line-separated
 
   for (let i = 0; i < nargs; i++) {
-    kernel.push(
-      `@group(0) @binding(${i + 1}) var<storage, read> ${args[i]} : array<f32>;`,
+    shader.push(
+      `@group(0) @binding(${i}) var<storage, read> ${args[i]} : array<f32>;`,
     );
   }
-  kernel.push(
-    `@group(0) @binding(${nargs + 1}) var<storage, read_write> result : array<f32>;`,
+  shader.push(
+    `@group(0) @binding(${nargs}) var<storage, read_write> result : array<f32>;`,
   );
 
   const workgroupSize = device.limits.maxComputeWorkgroupSizeX;
 
-  kernel.push(
+  shader.push(
     `\n@compute @workgroup_size(${workgroupSize})`,
     "fn main(@builtin(global_invocation_id) id : vec3<u32>) {",
-    "  if (id.x >= uniforms.len) { return; }",
+    `  if (id.x >= ${kernel.size}) { return; }`,
     "  let gidx: i32 = i32(id.x);",
   );
 
@@ -230,7 +235,7 @@ function pipelineSource(device: GPUDevice, nargs: number, exp: AluExp): string {
   // Insert phony assignments for inputs that are not in use.
   // https://github.com/gpuweb/gpuweb/discussions/4582#discussioncomment-9146686
   for (let i = 0; i < args.length; i++) {
-    if (!usedArgs[i]) kernel.push(`  _ = &${args[i]};`);
+    if (!usedArgs[i]) shader.push(`  _ = &${args[i]};`);
   }
 
   const expContext = new Map<AluExp, string>();
@@ -249,6 +254,8 @@ function pipelineSource(device: GPUDevice, nargs: number, exp: AluExp): string {
       else if (op === AluOp.Idiv)
         source = dtype === DType.Int32 ? `(${a} / ${b})` : `floor(${a} / ${b})`;
       else if (op === AluOp.Mod) source = `(${a} % ${b})`;
+      else if (op === AluOp.Min) source = `min(${a}, ${b})`;
+      else if (op === AluOp.Max) source = `max(${a}, ${b})`;
       else if (op === AluOp.Cmplt) source = `(${a} < ${b})`;
       else if (op === AluOp.Cmpne) source = `(${a} != ${b})`;
     } else if (AluGroup.Unary.has(op)) {
@@ -263,6 +270,8 @@ function pipelineSource(device: GPUDevice, nargs: number, exp: AluExp): string {
       return constToWgsl(dtype, arg);
     } else if (op === AluOp.Special) {
       return arg[0] as string;
+    } else if (op === AluOp.Variable) {
+      return arg as string;
     } else if (op === AluOp.GlobalIndex) {
       source = `${args[arg]}[${gen(src[0])}]`;
     }
@@ -272,7 +281,7 @@ function pipelineSource(device: GPUDevice, nargs: number, exp: AluExp): string {
     if ((references.get(exp) ?? 0) > 1) {
       const name = gensym();
       expContext.set(exp, name);
-      kernel.push(`  let ${name}: ${typeName} = ${source};`);
+      shader.push(`  let ${name}: ${typeName} = ${source};`);
       return name;
     } else {
       expContext.set(exp, source);
@@ -280,13 +289,16 @@ function pipelineSource(device: GPUDevice, nargs: number, exp: AluExp): string {
     }
   };
 
-  kernel.push(`  result[gidx] = ${gen(exp)};`, "}");
-  return kernel.join("\n");
+  shader.push(`  result[gidx] = ${gen(exp)};`, "}");
+  return {
+    shader: shader.join("\n"),
+    grid: [Math.ceil(kernel.size / workgroupSize), 1],
+  };
 }
 
 function pipelineSubmit(
   device: GPUDevice,
-  pipeline: GPUComputePipeline,
+  { pipeline, grid }: ShaderDispatch,
   inputs: GPUBuffer[],
   outputs: GPUBuffer[],
 ) {
@@ -304,23 +316,13 @@ function pipelineSubmit(
     );
   }
 
-  const len = outputs[0].size / 4; // TODO: Assuming 4 bytes per element
-  const uniform = device.createBuffer({
-    size: 4, // bytes
-    usage: GPUBufferUsage.UNIFORM,
-    mappedAtCreation: true,
-  });
-  new Uint32Array(uniform.getMappedRange()).set([len]);
-  uniform.unmap();
-
   const bindGroup = device.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: { buffer: uniform } },
       ...inputs.map((buffer, i) => {
-        return { binding: i + 1, resource: { buffer } };
+        return { binding: i, resource: { buffer } };
       }),
-      { binding: inputs.length + 1, resource: { buffer: outputs[0] } },
+      { binding: inputs.length, resource: { buffer: outputs[0] } },
     ],
   });
 
@@ -330,7 +332,7 @@ function pipelineSubmit(
   const passEncoder = commandEncoder.beginComputePass();
   passEncoder.setPipeline(pipeline);
   passEncoder.setBindGroup(0, bindGroup);
-  passEncoder.dispatchWorkgroups(Math.ceil(len / workgroupSize));
+  passEncoder.dispatchWorkgroups(grid[0], grid[1]);
   passEncoder.end();
   device.queue.submit([commandEncoder.finish()]);
 }

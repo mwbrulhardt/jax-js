@@ -34,6 +34,12 @@ export class AluExp {
   static idiv(a: AluExp, b: AluExp): AluExp {
     return new AluExp(AluOp.Idiv, a.dtype, [a, b]);
   }
+  static min(a: AluExp, b: AluExp): AluExp {
+    return new AluExp(AluOp.Min, a.dtype, [a, b]);
+  }
+  static max(a: AluExp, b: AluExp): AluExp {
+    return new AluExp(AluOp.Max, a.dtype, [a, b]);
+  }
   static mod(a: AluExp, b: AluExp): AluExp {
     return new AluExp(AluOp.Mod, a.dtype, [a, b]);
   }
@@ -55,6 +61,9 @@ export class AluExp {
   }
   static special(dtype: DType, name: string, n: number): AluExp {
     return new AluExp(AluOp.Special, dtype, [], [name, n]);
+  }
+  static variable(dtype: DType, name: string): AluExp {
+    return new AluExp(AluOp.Variable, dtype, [], name);
   }
   static globalIndex(dtype: DType, gid: number, bufidx: AluExp): AluExp {
     return new AluExp(AluOp.GlobalIndex, dtype, [bufidx], gid);
@@ -162,6 +171,10 @@ export class AluExp {
           return Math.floor(x / y);
         case AluOp.Mod:
           return x % y;
+        case AluOp.Min:
+          return Math.min(x, y);
+        case AluOp.Max:
+          return Math.max(x, y);
         case AluOp.Cmplt:
           return x < y;
         case AluOp.Cmpne:
@@ -197,6 +210,8 @@ export class AluExp {
         return this.arg;
       case AluOp.Special:
         return context[this.arg[0]];
+      case AluOp.Variable:
+        return context[this.arg];
       case AluOp.GlobalIndex:
         if (!globals) throw new Error("Missing globals function");
         const gid: number = this.arg;
@@ -215,20 +230,101 @@ export enum AluOp {
   Mul = "Mul",
   Idiv = "Idiv",
   Mod = "Mod",
+  Min = "Min",
+  Max = "Max",
+
   Sin = "Sin",
   Cos = "Cos",
   Cast = "Cast",
+
   Cmplt = "Cmplt",
   Cmpne = "Cmpne",
   Where = "Where",
+
+  // Const is a literal constant, while GlobalIndex takes data from an array
+  // buffer. Special and Variable are distinguished since the former is for
+  // indices like the global invocation, while the latter is a value.
   Const = "Const", // arg = value
   Special = "Special", // arg = [variable, n]
+  Variable = "Variable", // arg = variable
   GlobalIndex = "GlobalIndex", // arg = gid; src = [bufidx]
 }
 
 export const AluGroup = {
-  Binary: new Set([AluOp.Add, AluOp.Sub, AluOp.Mul, AluOp.Idiv, AluOp.Mod]),
+  Binary: new Set([
+    AluOp.Add,
+    AluOp.Sub,
+    AluOp.Mul,
+    AluOp.Idiv,
+    AluOp.Mod,
+    AluOp.Min,
+    AluOp.Max,
+  ]),
   Unary: new Set([AluOp.Sin, AluOp.Cos, AluOp.Cast]),
   Compare: new Set([AluOp.Cmplt, AluOp.Cmpne]),
-  Variable: new Set([AluOp.Special, AluOp.GlobalIndex]),
+  Variable: new Set([AluOp.Special, AluOp.Variable, AluOp.GlobalIndex]),
+  Reduce: new Set([AluOp.Add, AluOp.Mul, AluOp.Min, AluOp.Max]),
 };
+
+/**
+ * Description of a kernel to be compiled.
+ *
+ * Each of these can be processed by a backend into some lower-level
+ * representation. It consists of one or more fused operations, optionally
+ * indexing into a buffer.
+ */
+export class Kernel {
+  constructor(
+    /** Number of global arguments / arrays. */
+    readonly nargs: number,
+    /** Size of the result array in element count. */
+    readonly size: number,
+    /** Expression to be evaluated. */
+    readonly exp: AluExp,
+    /** Optional reduction to be performed. */
+    readonly reduction?: Reduction,
+  ) {}
+
+  /** Unique string representation of this object, usable as a map key. */
+  toString() {
+    JSON.stringify(this, (_key, value) => {
+      // Make sure that we sort the keys alphabetically for determinism.
+      if (value instanceof Object && !(value instanceof Array)) {
+        return Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),
+        );
+      }
+      return value;
+    });
+  }
+}
+
+/**
+ * Description of a reduction.
+ *
+ * The strategy of jax-js backends is to either handle a standard operation that
+ * is dispatched in a vectorized way over an array, or to reduce over one axis
+ * of some computation. This is a description of the reduction.
+ *
+ * Reduction only supports a few operations, and only over one axis. Users can
+ * always `flatten()` the array before reducing if needed.
+ *
+ * The backend is responsible for implementing the reduction in a way that
+ * minimizes the number of global memory loads, for efficiency. This involves
+ * passing through some optimization strategy. But optimizations are not coded
+ * at this level since they depend on GPU, versus CPU or Wasm.
+ */
+export class Reduction {
+  constructor(
+    /** Data type of the values being reduced over. */
+    readonly dtype: DType,
+    /** Operation to perform. Only a few reduction ops are supported. */
+    readonly op: AluOp.Add | AluOp.Mul | AluOp.Min | AluOp.Max,
+    /** Axis to reduce over. */
+    readonly axis: number,
+    /** Size of the reduction axis. */
+    readonly size: number,
+    /** Follow-up expression defined with the "reduced" variable, defaults to identity. */
+    readonly fusion: AluExp = AluExp.variable(dtype, "reduced"),
+  ) {}
+}

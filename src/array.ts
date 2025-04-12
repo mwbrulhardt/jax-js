@@ -1,4 +1,4 @@
-import { AluExp, AluOp, DType } from "./alu";
+import { AluExp, AluOp, DType, Kernel } from "./alu";
 import {
   accessorAluExp,
   accessorGlobal,
@@ -14,7 +14,13 @@ import { deepEqual, isPermutation } from "./utils";
 const JsArray = globalThis.Array;
 
 function gidxVar(size: number) {
-  return AluExp.special(DType.Int32, "gidx", 0);
+  // global index
+  return AluExp.special(DType.Int32, "gidx", size);
+}
+
+function ridxVar(size: number) {
+  // reduction index
+  return AluExp.special(DType.Int32, "ridx", size);
 }
 
 class PendingExecute {
@@ -23,7 +29,7 @@ class PendingExecute {
   #promise: Promise<void> | null = null; // for prepare
 
   constructor(
-    readonly exp: AluExp,
+    readonly kernel: Kernel,
     readonly inputs: Slot[],
     readonly outputs: Slot[],
   ) {}
@@ -35,14 +41,14 @@ class PendingExecute {
       return;
     }
     this.#promise = (async () => {
-      this.prepared = await backend.prepare(this.inputs.length, this.exp);
+      this.prepared = await backend.prepare(this.kernel);
     })();
     await this.#promise;
   }
 
   prepareSync(backend: Backend) {
     if (this.prepared) return;
-    this.prepared = backend.prepareSync(this.inputs.length, this.exp);
+    this.prepared = backend.prepareSync(this.kernel);
   }
 
   submit(backend: Backend) {
@@ -199,12 +205,16 @@ export class Array {
       }
     }
 
-    const exp = new AluExp(op, this.dtype, src);
-    const output = this.#backend.malloc(this.#st.size * 4);
+    const kernel = new Kernel(
+      src.length,
+      this.#st.size,
+      new AluExp(op, this.dtype, src),
+    );
+    const output = this.#backend.malloc(kernel.size * 4);
     const pending = [
       ...this.#pending,
       ...other.#pending,
-      new PendingExecute(exp, inputs, [output]),
+      new PendingExecute(kernel, inputs, [output]),
     ];
     return new Array(
       output,
@@ -226,18 +236,20 @@ export class Array {
   #realize(): void {
     const gidx = gidxVar(this.#st.size);
     if (this.#source instanceof AluExp) {
-      const output = this.#backend.malloc(this.#st.size * 4);
       const exp = accessorAluExp(this.#source, this.#st, gidx);
-      const pendingItem = new PendingExecute(exp, [], [output]);
+      const kernel = new Kernel(0, this.#st.size, exp);
+      const output = this.#backend.malloc(kernel.size * 4);
+      const pendingItem = new PendingExecute(kernel, [], [output]);
       this.#source = output;
       this.#st = ShapeTracker.fromShape(this.shape);
       this.#pendingSet = new Set([pendingItem]);
     } else {
       // Only realize if the ShapeTracker is non-contiguous.
       if (this.#st.contiguous) return;
-      const output = this.#backend.malloc(this.#st.size * 4);
       const exp = accessorGlobal(0, this.#st, gidx);
-      const pendingItem = new PendingExecute(exp, [this.#source], [output]);
+      const kernel = new Kernel(1, this.#st.size, exp);
+      const output = this.#backend.malloc(kernel.size * 4);
+      const pendingItem = new PendingExecute(kernel, [this.#source], [output]);
       this.#source = output;
       this.#st = ShapeTracker.fromShape(this.shape);
       this.#pendingSet ??= new Set();
