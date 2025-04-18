@@ -35,8 +35,9 @@ npm test
   - [ ] "Unroll" optimizations
   - [ ] "Upcast" optimizations (i.e., Wasm SIMD)
 - [ ] We figure out the `dispose()` / refcount / linear types stuff
-- [ ] Device switching with `.to()` between webgl/webgpu/cpu/wasm
 - [ ] Demos: Navier-Stokes, neural networks, statistics
+- [ ] Wasm backend (needs malloc)
+- [ ] Device switching with `.to()` between webgpu/cpu/wasm
 - [ ] `jit()` support via Jaxprs and kernel fusion
 - [ ] Other dtypes like int32 and bool
 - [ ] numpy/jax API compatibility table
