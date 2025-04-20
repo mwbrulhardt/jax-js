@@ -61,8 +61,8 @@ suite("jax.vmap()", () => {
   test("vectorizes a function with multiple arguments", () => {
     // f adds its two array arguments.
     const f = (x: np.Array, y: np.Array) => x.add(y);
-    // Both arguments are batched over axis 0.
-    const batchedF = vmap(f, [0, 0]);
+    // Batch x over axis 0 and y over axis 1.
+    const batchedF = vmap(f, [0, 1]);
     const x = np.array([
       [1, 2],
       [3, 4],
@@ -72,8 +72,8 @@ suite("jax.vmap()", () => {
       [30, 40],
     ]);
     expect(batchedF(x, y).js()).toEqual([
-      [11, 22],
-      [33, 44],
+      [11, 32],
+      [23, 44],
     ]);
   });
 
