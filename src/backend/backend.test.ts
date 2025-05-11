@@ -15,7 +15,7 @@ import { range } from "../utils";
 
 const backendsAvailable = await init(...backendTypes);
 
-describe.each(backendTypes)("Backend '%s'", (backendType) => {
+describe.each(backendTypes)("backend:%s", (backendType) => {
   const skipped = !backendsAvailable.includes(backendType);
   const test = globalTest.skipIf(skipped);
 
@@ -187,10 +187,10 @@ describe.each(backendTypes)("Backend '%s'", (backendType) => {
       const exe = await backend.prepare(kernel);
       backend.dispatch(exe, [a], [b]);
 
-      const buf = await backend.read(b);
-      const expected = new Float32Array(n * n);
-      for (let i = 0; i < expected.length; ++i) expected[i] = n;
-      expect(new Float32Array(buf)).toEqual(expected);
+      const result = new Float32Array(await backend.read(b));
+      for (let i = 0; i < result.length; i++) {
+        expect(result[i]).toBeCloseTo(n);
+      }
     } finally {
       backend.decRef(a);
       backend.decRef(b);

@@ -5,7 +5,7 @@ import { Array, array } from "./array";
 
 const backendsAvailable = await init(...backendTypes);
 
-describe.each(backendTypes)("Backend '%s'", (backend) => {
+describe.each(backendTypes)("backend:%s", (backend) => {
   const skipped = !backendsAvailable.includes(backend);
   const test = globalTest.skipIf(skipped);
 

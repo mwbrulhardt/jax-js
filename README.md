@@ -10,7 +10,6 @@ npm test
 
 ## Next on Eric's mind
 
-- How to do optimizations?? map out the plan
 - Think about two-stage `cumsum()`
 - Disposal by enforcing a `.ref` getter? This isn't included in console.log, but it's included in `{...spread}` syntax, hopefully not used often with arrays.
   ```js
@@ -31,7 +30,7 @@ npm test
   - [x] Create `class Array {}` wrappers
   - [x] Reduction operations
 - [ ] Kernel tuning (see `tuner.ts`)
-  - [ ] "Upcast" optimizations (compute a tile per thread, e.g., matmul)
+  - [x] "Upcast" optimizations (compute a tile per thread, e.g., matmul)
   - [ ] "Unroll" optimizations (multiple loop iters per thread, e.g., matmul)
   - [ ] "Group" optimizations (multiple threads per value, e.g., matvec)
 - [ ] We figure out the `dispose()` / refcount / linear types stuff

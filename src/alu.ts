@@ -288,6 +288,12 @@ export class AluExp {
     const src = this.src.map((x) => x.simplify(cache));
     const { op } = this;
 
+    // Constant folding.
+    if (src.every((x) => x.op === AluOp.Const) && !AluGroup.Variable.has(op)) {
+      const newExp = new AluExp(op, this.dtype, src, this.arg);
+      return AluExp.const(this.dtype, newExp.evaluate({}));
+    }
+
     // Folding with one item being a no-op constant.
     if (AluGroup.Binary.has(op)) {
       for (let i = 0; i < 2; i++) {
@@ -319,7 +325,7 @@ export class AluExp {
       op === AluOp.Mod &&
       src[1].op === AluOp.Const &&
       src[0].min >= 0 &&
-      src[0].max <= src[1].arg
+      src[0].max < src[1].arg
     ) {
       return src[0];
     }
@@ -423,11 +429,6 @@ export class AluExp {
     const newExp = src.every((s, i) => s === this.src[i])
       ? this
       : new AluExp(op, this.dtype, src, this.arg);
-
-    // Constant folding.
-    if (src.every((x) => x.op === AluOp.Const) && !AluGroup.Variable.has(op)) {
-      return AluExp.const(this.dtype, newExp.evaluate({}));
-    }
 
     return newExp;
   }

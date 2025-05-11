@@ -30,13 +30,16 @@ export interface TuneResult {
   /** New expression with GlobalView ops and gidx/ridx lowered. */
   exp: AluExp;
 
-  /** Expression for indexing the result array, if upcasting. */
-  outputIdxExp?: AluExp;
+  /** Expression for indexing the result array, including upcast. */
+  outputIdxExp: AluExp;
+
+  /** How many total threads to dispatch in the grid. */
+  threadCount: number;
 
   /** Sizes of various dimensions of the kernel. */
   size: {
     /**
-     * Number of threads in a group.
+     * Number of threads for each group.
      * If greater than 1, group index is available as `AluExp.special("group")`.
      */
     groups?: number;
@@ -156,6 +159,8 @@ export function tuneNullopt(kernel: Kernel): TuneResult {
       })
       .substitute(vars)
       .simplify(),
+    outputIdxExp: AluExp.special(DType.Int32, "gidx", kernel.size),
+    threadCount: kernel.size,
     size: {
       reduce: kernel.reduction ? kernel.reduction.size : 0,
     },
@@ -289,14 +294,17 @@ export function tuneWebgpu(kernel: Kernel): TuneResult {
     );
   }
 
+  const size = {
+    groups: prod(dim.st.shape.slice(dim.groups, dim.reduce)),
+    reduce: prod(dim.st.shape.slice(dim.reduce, dim.unroll)),
+    unroll: prod(dim.st.shape.slice(dim.unroll, dim.upcast)),
+    upcast: prod(dim.st.shape.slice(dim.upcast)),
+  };
+
   return {
     exp: newExp.simplify(),
-    outputIdxExp,
-    size: {
-      groups: prod(dim.st.shape.slice(dim.groups, dim.reduce)),
-      reduce: prod(dim.st.shape.slice(dim.reduce, dim.unroll)),
-      unroll: prod(dim.st.shape.slice(dim.unroll, dim.upcast)),
-      upcast: prod(dim.st.shape.slice(dim.upcast)),
-    },
+    outputIdxExp: outputIdxExp.simplify(),
+    threadCount: (kernel.size / size.upcast) * size.groups,
+    size,
   };
 }

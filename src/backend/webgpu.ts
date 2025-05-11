@@ -190,16 +190,6 @@ function pipelineSource(
 ): { shader: string; grid: [number, number] } {
   const tune = tuneWebgpu(kernel);
 
-  if (tune.size.groups ?? 1 > 1) {
-    throw new Error("WebGPU backend does not support group optimization yet");
-  }
-  if (tune.size.unroll ?? 1 > 1) {
-    throw new Error("WebGPU backend does not support unrolling yet");
-  }
-  if (tune.size.upcast ?? 1 > 1) {
-    throw new Error("WebGPU backend does not support upcasting yet");
-  }
-
   const { nargs } = kernel;
   const args = Array.from({ length: nargs }, (_, i) => `in${i}`);
 
@@ -228,7 +218,7 @@ function pipelineSource(
   );
 
   const workgroupSize = findPow2(
-    kernel.size,
+    tune.threadCount,
     device.limits.maxComputeWorkgroupSizeX,
   );
 
@@ -237,7 +227,7 @@ function pipelineSource(
     `@compute @workgroup_size(${workgroupSize})`,
     "fn main(@builtin(global_invocation_id) id : vec3<u32>) {",
     pushIndent,
-    `if (id.x >= ${kernel.size}) { return; }`,
+    `if (id.x >= ${tune.threadCount}) { return; }`,
     "let gidx: i32 = i32(id.x);",
   );
 
@@ -257,7 +247,6 @@ function pipelineSource(
     if (!usedArgs[i]) emit(`_ = &${args[i]};`);
   }
 
-  // TODO: Fix reference counting for upcast / unroll substitution.
   const references = new Map<AluExp, number>();
   const seen = new Set<AluExp>();
   const countReferences = (exp: AluExp) => {
@@ -267,7 +256,6 @@ function pipelineSource(
       for (const src of exp.src) countReferences(src);
     }
   };
-  countReferences(tune.exp);
 
   const expContext = new Map<AluExp, string>();
   const gen = (exp: AluExp): string => {
@@ -321,29 +309,75 @@ function pipelineSource(
   };
 
   if (!kernel.reduction) {
+    countReferences(tune.exp);
     emit(`result[gidx] = ${gen(tune.exp)};`);
   } else {
-    // Simple, unoptimized reduction kernel.
     const re = kernel.reduction;
+    if ((tune.size.groups ?? 1) > 1) {
+      throw new Error("WebGPU backend does not support group optimization yet");
+    }
+    if ((tune.size.unroll ?? 1) > 1) {
+      throw new Error("WebGPU backend does not support unrolling yet");
+    }
+    const upcast = tune.size.upcast ?? 1;
+
+    const acc = [...Array(upcast)].map((_, i) => `acc${i}`);
+    for (let i = 0; i < upcast; i++) {
+      emit(
+        `var ${acc[i]}: ${dtypeToWgsl(tune.exp.dtype)} = ${constToWgsl(re.dtype, re.identity)};`,
+      ); // Initialize accumulators.
+    }
+
     emit(
-      `var acc: ${dtypeToWgsl(re.dtype)} = ${constToWgsl(re.dtype, re.identity)};`,
       `for (var ridx: i32 = 0; ridx < ${tune.size.reduce}; ridx++) {`,
       pushIndent,
     );
-    const item = gen(tune.exp);
-    if (re.op === AluOp.Add) emit(`acc += ${item};`);
-    else if (re.op === AluOp.Mul) emit(`acc *= ${item};`);
-    else if (re.op === AluOp.Min) emit(`acc = min(acc, ${item});`);
-    else if (re.op === AluOp.Max) emit(`acc = max(acc, ${item});`);
-    else throw new Error(`Unsupported reduction op: ${re.op}`);
+
+    // Now generate expressions for each accumulator, with shared.
+    const exps: AluExp[] = [];
+    const cache = new Map<bigint, AluExp>();
+    for (let i = 0; i < upcast; i++) {
+      const exp = tune.exp.substitute({ upcast: AluExp.i32(i) });
+      exps.push(exp.simplify(cache));
+      countReferences(exps[i]);
+    }
+
+    // After references are counted, we can start generating code.
+    const items = exps.map(gen);
+
+    for (let i = 0; i < upcast; i++) {
+      if (re.op === AluOp.Add) emit(`${acc[i]} += ${items[i]};`);
+      else if (re.op === AluOp.Mul) emit(`${acc[i]} *= ${items[i]};`);
+      else if (re.op === AluOp.Min)
+        emit(`${acc[i]} = min(${acc[i]}, ${items[i]});`);
+      else if (re.op === AluOp.Max)
+        emit(`${acc[i]} = max(${acc[i]}, ${items[i]});`);
+      else throw new Error(`Unsupported reduction op: ${re.op}`);
+    }
     emit(popIndent, "}");
-    emit(`result[gidx] = ${gen(re.fusion)};`);
+
+    // After exiting the scope, erase any local variables.
+    expContext.clear();
+    references.clear();
+    seen.clear();
+    const outputIdxExps: AluExp[] = [];
+    for (let i = 0; i < upcast; i++) {
+      const exp = tune.outputIdxExp.substitute({ upcast: AluExp.i32(i) });
+      outputIdxExps.push(exp.simplify(cache));
+      countReferences(outputIdxExps[i]);
+    }
+    for (let i = 0; i < upcast; i++) {
+      const result = re.fusion.substitute({
+        acc: AluExp.variable(re.dtype, acc[i]),
+      });
+      emit(`result[${gen(outputIdxExps[i])}] = ${gen(result)};`);
+    }
   }
 
   emit(popIndent, "}");
   return {
     shader: shader.join("\n"),
-    grid: [Math.ceil(kernel.size / workgroupSize), 1],
+    grid: [Math.ceil(tune.threadCount / workgroupSize), 1],
   };
 }
 
