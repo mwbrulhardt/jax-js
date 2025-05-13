@@ -101,6 +101,18 @@ export const moveaxis = vmapModule.moveaxis as (
   dst: number,
 ) => Array;
 
+/** Return the number of dimensions of an array. */
+export const ndim = core.ndim as (x: ArrayLike) => number;
+
+/** Return the shape of an array. */
+export const shape = core.getShape as (x: ArrayLike) => number[];
+
+/** Return the number of elements in an array, optionally along an axis. */
+export function size(a: ArrayLike, axis?: number): number {
+  const s = shape(a);
+  return axis === undefined ? prod(s) : s[axis];
+}
+
 /** Reverse the elements in an array along the given axes. */
 export function flip(x: ArrayLike, axis?: number | number[]): Array {
   const nd = ndim(x);
@@ -125,17 +137,21 @@ export function flip(x: ArrayLike, axis?: number | number[]): Array {
   return core.flip(x, axis) as Array;
 }
 
+/** Flip an array vertically (axis=0). */
+export function flipud(x: ArrayLike): Array {
+  return flip(x, 0);
+}
+
+/** Flip an array horizontally (axis=1). */
+export function fliplr(x: ArrayLike): Array {
+  return flip(x, 1);
+}
+
 // Alternate or equivalent names for functions, from numpy.
 export const permuteDims = transpose;
 
 // Version of pureArray with fudged types.
 const fudgeArray = pureArray as (x: ArrayLike) => Array;
-
-/** Return the number of elements in an array, optionally along an axis. */
-export function size(a: ArrayLike, axis?: number): number {
-  const s = shape(a);
-  return axis === undefined ? prod(s) : s[axis];
-}
 
 /**
  * Return specified diagonals.
@@ -184,12 +200,6 @@ export function diag(v: ArrayLike, k = 0): Array {
     throw new TypeError("numpy.diag only supports 1D and 2D arrays");
   }
 }
-
-/** Return the number of dimensions of an array. */
-export const ndim = core.ndim as (x: ArrayLike) => number;
-
-/** Return the shape of an array. */
-export const shape = core.getShape as (x: ArrayLike) => number[];
 
 /** Return if two arrays are element-wise equal within a tolerance. */
 export function allclose(
