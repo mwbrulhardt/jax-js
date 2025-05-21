@@ -230,6 +230,13 @@ suite.each(backendTypes)("backend:%s", (backend) => {
   });
 
   suite("jax.numpy.matmul()", () => {
+    test("acts as vector dot product", () => {
+      const x = np.array([1, 2, 3, 4]);
+      const y = np.array([10, 100, 1000, 1]);
+      const z = np.matmul(x, y);
+      expect(z.js()).toEqual(3214);
+    });
+
     test("computes 2x2 matmul", () => {
       const x = np.array([
         [1, 2],
