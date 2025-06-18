@@ -66,13 +66,6 @@ npm test
 - How many threads to create per workgroup, depends on hardware
   - Need to break up kernel dispatches if workgroup count exceeds 65536
 - Think about two-stage `cumsum()`
-- Disposal by enforcing a `.ref` getter? This isn't included in console.log, but it's included in `{...spread}` syntax, hopefully not used often with arrays.
-  ```js
-  let f = (x) => x.ref.mul(x.ref).mul(x);
-  let df = grad(f); // d/dx (x^3) = 3x^2
-  expect(df(4)).toBeAllclose(48);
-  expect(df(5)).toBeAllclose(75);
-  ```
 - Frontend transformations need to match backend type for pureArray() and zeros() calls
 - Need to break up operations if jit stitches more than 16 inputs
 

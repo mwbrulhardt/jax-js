@@ -203,11 +203,14 @@ class PartialEvalTracer extends Tracer {
   }
 
   get ref() {
+    if (this.#rc <= 0) {
+      throw new UseAfterFreeError(this);
+    }
     this.#rc++;
     return this;
   }
   dispose() {
-    if (this.#rc === 0) {
+    if (this.#rc <= 0) {
       throw new UseAfterFreeError(this);
     }
     if (--this.#rc === 0) {
