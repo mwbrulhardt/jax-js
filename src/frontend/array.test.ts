@@ -103,8 +103,7 @@ suite.each(backendTypes)("backend:%s", (backend) => {
     expect(b.notEqual(array([2, 3, 4])).js()).toEqual([true, false, false]);
   });
 
-  // TODO: Figure out why this is not working on WebGPU backend.
-  test.skip("comparison operators async", async () => {
+  test("comparison operators async", async () => {
     const x = array([1, 2, 3]);
     expect(await x.ref.greater(2).jsAsync()).toEqual([false, false, true]);
     expect(await x.ref.greaterEqual(2).jsAsync()).toEqual([false, true, true]);
@@ -119,7 +118,7 @@ suite.each(backendTypes)("backend:%s", (backend) => {
     ar = ar.add(1);
     const vals = (await ar.less(2500).data()) as Int32Array;
     for (let i = 0; i < vals.length; i++) {
-      expect(vals[i]).toEqual(i + 1 < 2500);
+      expect(vals[i]).toEqual(i + 1 < 2500 ? 1 : 0);
     }
   });
 });

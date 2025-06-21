@@ -62,7 +62,6 @@ npm test
 
 ## Next on Eric's mind
 
-- Figure out why async data() is not working on WebGPU backend
 - Timing / perf on Mandelbrot example
 - Test for if you take sin(), cos() of an int/bool
 - Rename "backend" to "device" in public API

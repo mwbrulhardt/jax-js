@@ -95,8 +95,7 @@ export class WebGPUBackend implements Backend {
 
       await staging.mapAsync(GPUMapMode.READ);
       const arrayBuffer = staging.getMappedRange();
-      const data = new Float32Array(arrayBuffer);
-      return data.slice();
+      return arrayBuffer.slice();
     } finally {
       staging.destroy();
     }
