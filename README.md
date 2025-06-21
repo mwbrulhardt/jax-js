@@ -62,14 +62,14 @@ npm test
 
 ## Next on Eric's mind
 
-- Timing / perf on Mandelbrot example
+- Continue timing / perf on Mandelbrot example
+- Need to break up operations if jit stitches more than 10 inputs (maxStorageBuffersPerShaderStage)
 - Test for if you take sin(), cos() of an int/bool
 - Rename "backend" to "device" in public API
 - How many threads to create per workgroup, depends on hardware
   - Need to break up kernel dispatches if workgroup count exceeds 65536
 - Think about two-stage `cumsum()`
 - Frontend transformations need to match backend type for pureArray() and zeros() calls
-- Need to break up operations if jit stitches more than 16 inputs
 
 ## Milestones
 
