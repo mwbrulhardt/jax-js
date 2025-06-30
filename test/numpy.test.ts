@@ -602,4 +602,56 @@ suite.each(devices)("device:%s", (device) => {
       ]);
     });
   });
+
+  suite("jax.numpy.min()", () => {
+    test("computes minimum of 1D array", () => {
+      const x = np.array([3, 1, 4, 2]);
+      const y = np.min(x);
+      expect(y.js()).toEqual(1);
+    });
+
+    test("computes minimum of 2D array along axis", () => {
+      const x = np.array([
+        [3, 1, 4],
+        [2, 5, 0],
+      ]);
+      const y = np.min(x, 0);
+      expect(y.js()).toEqual([2, 1, 0]);
+    });
+
+    test("computes minimum of 2D array without axis", () => {
+      const x = np.array([
+        [3, 1, 4],
+        [2, 5, 0],
+      ]);
+      const y = np.min(x);
+      expect(y.js()).toEqual(0);
+    });
+  });
+
+  suite("jax.numpy.max()", () => {
+    test("computes maximum of 1D array", () => {
+      const x = np.array([3, 1, 4, 2]);
+      const y = np.max(x);
+      expect(y.js()).toEqual(4);
+    });
+
+    test("computes maximum of 2D array along axis", () => {
+      const x = np.array([
+        [3, 1, 4],
+        [2, 5, 0],
+      ]);
+      const y = np.max(x, 0);
+      expect(y.js()).toEqual([3, 5, 4]);
+    });
+
+    test("computes maximum of 2D array without axis", () => {
+      const x = np.array([
+        [3, 1, 4],
+        [2, 5, 0],
+      ]);
+      const y = np.max(x);
+      expect(y.js()).toEqual(5);
+    });
+  });
 });

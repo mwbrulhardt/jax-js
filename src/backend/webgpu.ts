@@ -195,6 +195,8 @@ function constToWgsl(dtype: DType, value: any): string {
   if (dtype === DType.Bool) return value ? "true" : "false";
   if (dtype === DType.Int32) return value.toString();
   if (dtype === DType.Float32) {
+    if (Number.isNaN(value)) return "nan()";
+    if (!Number.isFinite(value)) return value > 0 ? "inf()" : "-inf()";
     let s = value.toString();
     if (!s.includes(".")) s += ".0";
     return s;
@@ -231,6 +233,14 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
       else shader.push(line ? indent + (line as string) : line);
     }
   };
+
+  // Prelude included in all shaders.
+  emit(
+    // Const-folded infinity and NaN result in compile errors.
+    "fn nan() -> f32 { let bits = 0xffffffffu; return bitcast<f32>(bits); }",
+    "fn inf() -> f32 { let bits = 0x7f800000u; return bitcast<f32>(bits); }",
+    "",
+  );
 
   const usedArgs: (DType | null)[] = Array.from({ length: nargs }, () => null);
   tune.exp.fold((exp) => {

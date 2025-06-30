@@ -148,6 +148,16 @@ export function prod(a: ArrayLike, axis?: number | number[]): Array {
   return core.reduce(a, AluOp.Mul, axis) as Array;
 }
 
+/** Return the minimum of array elements along a given axis. */
+export function min(a: ArrayLike, axis?: number | number[]): Array {
+  return core.reduce(a, AluOp.Min, axis) as Array;
+}
+
+/** Return the maximum of array elements along a given axis. */
+export function max(a: ArrayLike, axis?: number | number[]): Array {
+  return core.reduce(a, AluOp.Max, axis) as Array;
+}
+
 /** Reverse the elements in an array along the given axes. */
 export function flip(x: ArrayLike, axis?: number | number[]): Array {
   const nd = ndim(x);
