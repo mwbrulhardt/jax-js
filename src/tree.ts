@@ -136,3 +136,18 @@ function _unflatten<T>(treedef: JsTreeDef, leaves: Iterator<T>): JsTree<T> {
     }
   }
 }
+
+/** Maps a multi-input function over pytree args to produce a new pytree. */
+export function map<T, U, Tree extends JsTree<T>>(
+  fn: (...args: T[]) => U,
+  tree: Tree,
+  ...rest: Tree[]
+): MapJsTree<Tree, T, U> {
+  const [leaves, treedef] = flatten<T>(tree);
+  const restLeaves = rest.map((x) => flatten<T>(x)[0]);
+  const resultLeaves: U[] = [];
+  for (let i = 0; i < leaves.length; i++) {
+    resultLeaves.push(fn(leaves[i], ...restLeaves.map((x) => x[i])));
+  }
+  return unflatten(treedef, resultLeaves) as MapJsTree<Tree, T, U>;
+}

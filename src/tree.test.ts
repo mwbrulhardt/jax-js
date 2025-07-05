@@ -1,6 +1,6 @@
 import { expect, suite, test } from "vitest";
 
-import { flatten, JsTreeDef, NodeType, unflatten } from "./tree";
+import { flatten, JsTreeDef, map, NodeType, unflatten } from "./tree";
 
 suite("JsTreeDef.toString()", () => {
   test("should return '*' for a leaf", () => {
@@ -147,5 +147,22 @@ suite("JsTreeDef.equals()", () => {
 
     expect(treedef1.equals(treedef2)).toBe(false);
     expect(treedef1.equals(treedef3)).toBe(false);
+  });
+});
+
+suite("map()", () => {
+  test("should map a single-argument function", () => {
+    const myTree = { a: [1, 2], b: { c: 3 } };
+    const result = map((x: number) => x * 2, myTree);
+    const expected = { a: [2, 4], b: { c: 6 } };
+    expect(result).toEqual(expected);
+  });
+
+  test("should map a multi-argument function", () => {
+    const tree1 = { a: [1, 2], b: { c: 3 } };
+    const tree2 = { a: [4, 5], b: { c: 6 } };
+    const result = map((x: number, y: number) => x + y, tree1, tree2);
+    const expected = { a: [5, 7], b: { c: 9 } };
+    expect(result).toEqual(expected);
   });
 });
