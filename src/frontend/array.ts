@@ -465,9 +465,9 @@ export class Array extends Tracer {
     const exp = custom(src);
     const kernel = new Kernel(inputs.length, arrays[0].#st.size, exp);
     const output = backend.malloc(kernel.size * 4);
-    const pending = [...arrays.flatMap((ar) => ar.#pending)];
+    const pending = new Set([...arrays.flatMap((ar) => ar.#pending)]);
     for (const exe of pending) exe.updateRc(+1);
-    pending.push(new PendingExecute(backend, kernel, inputs, [output]));
+    pending.add(new PendingExecute(backend, kernel, inputs, [output]));
 
     for (const ar of arrays) ar.dispose(); // Dispose of inputs after creating PendingExecute.
     return new Array(
@@ -762,8 +762,10 @@ export class Array extends Tracer {
         const { outputs, pending } = jp.execute(
           tracers.map((x) => x._realizeSource()),
         );
-        const prevPending = args.flatMap((x) => x.#pending);
-        for (const exe of prevPending) exe.updateRc(+1);
+        for (const exe of pending) exe.updateRc(+outputs.length - 1);
+
+        const prevPending = [...new Set(args.flatMap((x) => x.#pending))];
+        for (const exe of prevPending) exe.updateRc(+outputs.length);
         pending.splice(0, 0, ...prevPending); // Dispatch order of pending kernels is important.
         args.forEach((x) => x.dispose()); // Dispose of args after dispatch.
 
