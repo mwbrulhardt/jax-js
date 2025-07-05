@@ -168,7 +168,7 @@ const jvpRules: { [P in Primitive]: JvpRule<P> } = {
       // We take average here to match the behavior of JAX. If there are
       // multiple minima, it's not well-defined which one to take as the tangent
       // vector (sharp discontinuity), so we average over all of them.
-      const notMin = notEqual(x, primal.ref);
+      const notMin = notEqual(x, broadcast(primal.ref, x.shape, axis));
       const minCount = where(notMin.ref, 0.0, 1.0).sum(axis);
       const tangent = where(notMin, op === AluOp.Min ? 0 : 0, dx)
         .sum(axis)
