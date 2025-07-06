@@ -1,3 +1,4 @@
+import { PPrint } from "./pprint";
 import { ShapeTracker } from "./shape";
 import { clamp, FpHash, FpHashable, strip1 } from "./utils";
 
@@ -816,6 +817,19 @@ export class Kernel implements FpHashable {
   hash(state: FpHash): void {
     state.update(this.nargs, this.size, this.exp, this.reduction);
   }
+
+  pprint(): PPrint {
+    let details = PPrint.pp(`exp = ${this.exp}`);
+    details = details.concat(PPrint.pp(`size = ${this.size}`));
+    if (this.reduction) {
+      details = details.concat(PPrint.pp(`reduction = ${this.reduction}`));
+    }
+    return PPrint.pp("{ ").stack(details).stack(PPrint.pp(" }"));
+  }
+
+  toString(): string {
+    return this.pprint().toString();
+  }
 }
 
 /**
@@ -851,6 +865,10 @@ export class Reduction implements FpHashable {
 
   hash(state: FpHash): void {
     state.update(this.dtype, this.op, this.size, this.fusion);
+  }
+
+  toString(): string {
+    return `${this.op}{${this.size}} -> ${this.fusion}`;
   }
 
   /** Get the identity for this reduction operation. */

@@ -4,6 +4,7 @@ import {
   jvp,
   linearize,
   makeJaxpr,
+  nn,
   numpy as np,
   vjp,
   vmap,
@@ -180,6 +181,58 @@ suite("jax.grad()", () => {
     ]);
     expect(dx2.js()).toEqual([[3], [3]]);
     expect(dy2.js()).toEqual([2, 2, 2]);
+  });
+
+  test("backprop handles dense layer", () => {
+    type Params = {
+      w: np.Array;
+      b: np.Array;
+    };
+
+    // x is of shape [batch, dim_in]
+    // params.w is of shape [dim_in, dim_out]
+    // params.b is of shape [dim_out]
+
+    // const dense = (params: Params, x: np.Array) =>
+    //   np
+    //     .multiply(x.reshape([...x.shape, 1]), params.w)
+    //     .sum(-2)
+    //     .add(params.b);
+
+    const dense = (params: Params, x: np.Array) =>
+      np.dot(x, params.w).add(params.b);
+
+    const loss = (params: Params, x: np.Array) =>
+      nn.logSoftmax(dense(params, x)).slice([], 0).sum().mul(0.5);
+
+    const params: Params = {
+      w: np.array([
+        [0.1, 0.2, -0.3, 0.0],
+        [0.5, -0.1, 0.3, 0.4],
+      ]),
+      b: np.array([0, 0, 0, 0]),
+    };
+    const x = np.array([
+      [0.1, 0.2],
+      [0.2, 0.3],
+    ]);
+
+    console.log(makeJaxpr(grad(loss))(params, x).jaxpr.toString());
+    const grads = grad(loss)(params, x);
+    expect(grads.w).toBeAllclose([
+      [
+        0.10957759618759155, -0.03502218425273895, -0.035850875079631805,
+        -0.038704533129930496,
+      ],
+      [
+        0.1827690452337265, -0.05844341218471527, -0.059866439551115036,
+        -0.0644591748714447,
+      ],
+    ]);
+    expect(grads.b).toBeAllclose([
+      0.7319144010543823, -0.23421229422092438, -0.2401556372642517,
+      -0.25754642486572266,
+    ]);
   });
 });
 

@@ -39,6 +39,14 @@ suite("PPrint.concat()", () => {
     const pp3 = PPrint.pp("c");
     expect(pp1.concat(pp2, pp3).toString()).toBe("a\nb\nc");
   });
+
+  test("prototype call", () => {
+    expect(PPrint.prototype.concat().toString()).toBe("");
+    expect(PPrint.prototype.concat(PPrint.pp("a")).toString()).toBe("a");
+    expect(
+      PPrint.prototype.concat(PPrint.pp("a"), PPrint.pp("b")).toString(),
+    ).toBe("a\nb");
+  });
 });
 
 suite("PPrint.stack()", () => {

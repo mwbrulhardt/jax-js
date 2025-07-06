@@ -13,7 +13,7 @@ export class PPrint {
     );
   }
 
-  /** Concatenate two or more pretty-printed expressions. */
+  /** Concatenate pretty-printed expressions with newlines. */
   concat(...items: PPrint[]): PPrint {
     return new PPrint(
       (this.indents ?? []).concat(...items.map((i) => i.indents)),

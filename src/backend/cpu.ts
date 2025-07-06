@@ -92,10 +92,10 @@ export class CPUBackend implements Backend {
 
     const globals = (gid: number, bufidx: number) => {
       if (gid < 0 || gid >= inputArrays.length)
-        throw new Error("gid out of bounds when evaluating: " + gid);
+        throw new Error("gid out of bounds: " + gid);
       if (bufidx < 0 || bufidx >= inputArrays[gid].length)
-        throw new Error("bufidx out of bounds when evaluating: " + bufidx);
-      inputArrays[gid][bufidx];
+        throw new Error("bufidx out of bounds: " + bufidx);
+      return inputArrays[gid][bufidx];
     };
     if (!kernel.reduction) {
       for (let i = 0; i < kernel.size; i++) {

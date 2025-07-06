@@ -2,6 +2,7 @@
 
 import { AluExp, AluOp, AluVar, Kernel, Reduction } from "../alu";
 import { Backend, Slot } from "../backend";
+import { PPrint } from "../pprint";
 import { ShapeTracker, unravelAlu } from "../shape";
 import { DEBUG, deepEqual, FpHash, prod, range, rep } from "../utils";
 import { aluCompare, Array, generalBroadcast, PendingExecute } from "./array";
@@ -44,6 +45,42 @@ export class JitProgram {
     readonly inputs: JitId[],
     readonly outputs: JitId[],
   ) {}
+
+  pprint(): PPrint {
+    const steps: PPrint[] = this.steps.map((step) => {
+      switch (step.type) {
+        case "execute": {
+          const inputsNice = step.inputs
+            .map((id, i) => `${i}: %${id}`)
+            .join(", ");
+          const outputsNice = step.outputs.map((id) => `%${id}`).join(", ");
+          return PPrint.pp(
+            `execute (${inputsNice}) -> ${outputsNice}, kernel`,
+          ).concat(step.kernel.pprint().indent(2));
+        }
+        case "const":
+          return PPrint.pp(`%${step.output} = const <Slot ${step.slot}>`);
+        case "malloc":
+          return PPrint.pp(`%${step.output} = malloc <${step.size} x 4 bytes>`);
+        case "incref":
+          return PPrint.pp(`incref ${step.input}`);
+        case "free":
+          return PPrint.pp(`free ${step.input}`);
+      }
+    });
+    const display = PPrint.prototype.concat(
+      PPrint.pp(`device = ${this.backend.type}`),
+      PPrint.pp("inputs = [" + this.inputs.join(", ") + "]"),
+      PPrint.pp("outputs = [" + this.outputs.join(", ") + "]"),
+      PPrint.pp("steps ="),
+      PPrint.prototype.concat(...steps).indent(2),
+    );
+    return PPrint.pp("{ ").stack(display.stack(PPrint.pp(" }")));
+  }
+
+  toString(): string {
+    return this.pprint().toString();
+  }
 
   /** Execute the JitProgram with the given inputs. */
   execute(inputs: Slot[]): { outputs: Slot[]; pending: PendingExecute[] } {
@@ -272,7 +309,7 @@ export function jitCompile(
             gid = inputArgs.length;
             inputArgs.push(jitValue.arg);
           }
-          const st = ShapeTracker.fromShape(input.aval.shape);
+          const st = ShapeTracker.fromShape(input.aval.shape); // "imm" is realized
           const indices = unravelAlu(st.shape, AluVar.gidx);
           inputExps.push(AluExp.globalView(input.aval.dtype, gid, st, indices));
         } else {
@@ -342,6 +379,7 @@ export function jitCompile(
   builder.insertFreeSteps(outputIds);
 
   const jp = new JitProgram(backend, builder.steps, range(0, nargs), outputIds);
+  if (DEBUG >= 4) console.info(jp.toString());
   jitCompileCache.set(cacheKey, jp);
   return jp;
 }
@@ -390,6 +428,7 @@ function reshapeJit<P extends Primitive>(
   fn: (st: ShapeTracker, params: PrimitiveParams<P>) => ShapeTracker,
 ): JitRule<P> {
   return (nargs, [a], [as], params) => {
+    const newShape = fn(ShapeTracker.fromShape(as.shape), params).shape;
     a = a.rewrite((exp) => {
       if (exp.op === AluOp.GlobalView) {
         const [gid, st]: [number, ShapeTracker] = exp.arg;
@@ -398,7 +437,7 @@ function reshapeJit<P extends Primitive>(
         return AluExp.globalView(exp.dtype, gid, newSt, indices);
       }
     });
-    return new Kernel(nargs, prod(as.shape), a);
+    return new Kernel(nargs, prod(newShape), a);
   };
 }
 
