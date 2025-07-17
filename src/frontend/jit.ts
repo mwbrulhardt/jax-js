@@ -61,7 +61,7 @@ export class JitProgram {
         case "const":
           return PPrint.pp(`%${step.output} = const <Slot ${step.slot}>`);
         case "malloc":
-          return PPrint.pp(`%${step.output} = malloc <${step.size} x 4 bytes>`);
+          return PPrint.pp(`%${step.output} = malloc <${step.size} bytes>`);
         case "incref":
           return PPrint.pp(`incref ${step.input}`);
         case "free":
@@ -114,7 +114,7 @@ export class JitProgram {
           scope.set(step.output, step.slot);
           break;
         case "malloc": {
-          const slot = this.backend.malloc(4 * step.size);
+          const slot = this.backend.malloc(step.size);
           scope.set(step.output, slot);
           break;
         }
@@ -174,7 +174,7 @@ class JitProgramBuilder {
     const id = this.#nextId++;
     this.steps.push({
       type: "malloc",
-      size: kernel.size,
+      size: kernel.bytes,
       output: id,
     });
     this.steps.push({
@@ -424,6 +424,15 @@ function broadcastedJit<P extends Primitive>(
   };
 }
 
+// Simpler JIT handler, equivalent to broadcastedJit for unary ops.
+function unopJit<P extends Primitive>(
+  fn: (exp: AluExp, params: PrimitiveParams<P>) => AluExp,
+): JitRule<P> {
+  return (nargs, [a], [as], params) => {
+    return new Kernel(nargs, prod(as.shape), fn(a, params));
+  };
+}
+
 function reshapeJit<P extends Primitive>(
   fn: (st: ShapeTracker, params: PrimitiveParams<P>) => ShapeTracker,
 ): JitRule<P> {
@@ -445,15 +454,15 @@ const jitRules: { [P in Primitive]: JitRule<P> } = {
   [Primitive.Add]: broadcastedJit(([a, b]) => AluExp.add(a, b)),
   [Primitive.Mul]: broadcastedJit(([a, b]) => AluExp.mul(a, b)),
   [Primitive.Idiv]: broadcastedJit(([a, b]) => AluExp.idiv(a, b)),
-  [Primitive.Neg]: broadcastedJit(([a]) =>
-    AluExp.sub(AluExp.const(a.dtype, 0), a),
-  ),
-  [Primitive.Reciprocal]: broadcastedJit(([a]) => AluExp.reciprocal(a)),
-  [Primitive.StopGradient]: broadcastedJit(([a]) => a), // No-op, just return the input.
-  [Primitive.Sin]: broadcastedJit(([a]) => AluExp.sin(a)),
-  [Primitive.Cos]: broadcastedJit(([a]) => AluExp.cos(a)),
-  [Primitive.Exp]: broadcastedJit(([a]) => AluExp.exp(a)),
-  [Primitive.Log]: broadcastedJit(([a]) => AluExp.log(a)),
+  [Primitive.Neg]: unopJit((a) => AluExp.sub(AluExp.const(a.dtype, 0), a)),
+  [Primitive.Reciprocal]: unopJit(AluExp.reciprocal),
+  [Primitive.StopGradient]: unopJit((a) => a), // No-op, just return the input.
+  [Primitive.Cast]: unopJit((a, { dtype }) => AluExp.cast(dtype, a)),
+  [Primitive.Bitcast]: unopJit((a, { dtype }) => AluExp.bitcast(dtype, a)),
+  [Primitive.Sin]: unopJit(AluExp.sin),
+  [Primitive.Cos]: unopJit(AluExp.cos),
+  [Primitive.Exp]: unopJit(AluExp.exp),
+  [Primitive.Log]: unopJit(AluExp.log),
   [Primitive.Min]: broadcastedJit(([a, b]) => AluExp.min(a, b)),
   [Primitive.Max]: broadcastedJit(([a, b]) => AluExp.max(a, b)),
   [Primitive.Reduce](nargs, [a], [as], { op, axis }) {

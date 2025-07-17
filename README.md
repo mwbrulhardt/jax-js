@@ -69,7 +69,6 @@ npm test
   - Reduce kernel overhead of constants / inline expressions
 - Investigate why jax-js Matmul is 2x slower on Safari TP than unroll kernel
 - How many threads to create per workgroup, depends on hardware
-- Need to add type-casting operation, like `astype()`, probably creates a view
 - Think about two-stage `cumsum()`
 - Frontend transformations need to match backend type for pureArray() and zeros() calls
 

@@ -257,4 +257,16 @@ suite.each(devices)("device:%s", (device) => {
     expect(b.ref.dataSync()).toEqual(new Uint32Array([4294967295, 0, 1]));
     expect(b.js()).toEqual([4294967295, 0, 1]);
   });
+
+  test("casting arrays", () => {
+    const a = array([1, 2, 3], { dtype: DType.Int32 });
+    expect(a.dtype).toBe(DType.Int32);
+    expect(a.ref.dataSync()).toEqual(new Int32Array([1, 2, 3]));
+    expect(a.ref.js()).toEqual([1, 2, 3]);
+
+    const b = a.astype(DType.Float32);
+    expect(b.dtype).toBe(DType.Float32);
+    expect(b.ref.dataSync()).toEqual(new Float32Array([1, 2, 3]));
+    expect(b.js()).toEqual([1, 2, 3]);
+  });
 });

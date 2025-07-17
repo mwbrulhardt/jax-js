@@ -4,7 +4,9 @@ import {
   AbstractValue,
   add,
   bind,
+  bitcast,
   broadcast,
+  cast,
   compare,
   cos,
   exp,
@@ -205,11 +207,11 @@ function broadcastBatcher(op: (...x: Tracer[]) => Tracer): VmapRule<Primitive> {
   };
 }
 
-function vectorizedUnopBatchingRule(
-  op: (x: Tracer) => Tracer,
-): VmapRule<Primitive> {
-  return (axisSize, [x], [xBdim]) => {
-    return [[op(x)], [xBdim]];
+function unopBatcher<P extends Primitive>(
+  op: (x: Tracer, params: PrimitiveParams<P>) => Tracer,
+): VmapRule<P> {
+  return (axisSize, [x], [xBdim], params) => {
+    return [[op(x, params)], [xBdim]];
   };
 }
 
@@ -217,13 +219,15 @@ const vmapRules: Partial<{ [P in Primitive]: VmapRule<P> }> = {
   [Primitive.Add]: broadcastBatcher(add),
   [Primitive.Mul]: broadcastBatcher(mul),
   [Primitive.Idiv]: broadcastBatcher(idiv),
-  [Primitive.Neg]: vectorizedUnopBatchingRule(neg),
-  [Primitive.Reciprocal]: vectorizedUnopBatchingRule(reciprocal),
-  [Primitive.StopGradient]: vectorizedUnopBatchingRule(stopGradient),
-  [Primitive.Sin]: vectorizedUnopBatchingRule(sin),
-  [Primitive.Cos]: vectorizedUnopBatchingRule(cos),
-  [Primitive.Exp]: vectorizedUnopBatchingRule(exp),
-  [Primitive.Log]: vectorizedUnopBatchingRule(log),
+  [Primitive.Neg]: unopBatcher(neg),
+  [Primitive.Reciprocal]: unopBatcher(reciprocal),
+  [Primitive.StopGradient]: unopBatcher(stopGradient),
+  [Primitive.Cast]: unopBatcher((x, { dtype }) => cast(x, dtype)),
+  [Primitive.Bitcast]: unopBatcher((x, { dtype }) => bitcast(x, dtype)),
+  [Primitive.Sin]: unopBatcher(sin),
+  [Primitive.Cos]: unopBatcher(cos),
+  [Primitive.Exp]: unopBatcher(exp),
+  [Primitive.Log]: unopBatcher(log),
   [Primitive.Min]: broadcastBatcher(min),
   [Primitive.Max]: broadcastBatcher(max),
   [Primitive.Reduce](axisSize, [x], [xBdim], { op, axis }) {

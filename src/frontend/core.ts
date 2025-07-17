@@ -27,6 +27,9 @@ export enum Primitive {
   Neg = "neg",
   Reciprocal = "reciprocal",
   StopGradient = "stop_gradient",
+  Cast = "cast",
+  Bitcast = "bitcast",
+  // RandomBits = "random_bits", // TODO - via threefry2x32
   Sin = "sin",
   Cos = "cos",
   Exp = "exp",
@@ -48,6 +51,8 @@ export enum Primitive {
 
 interface PrimitiveParamsImpl
   extends Record<Primitive, Record<string, unknown>> {
+  [Primitive.Cast]: { dtype: DType };
+  [Primitive.Bitcast]: { dtype: DType };
   [Primitive.Reduce]: { op: AluOp; axis: number[] };
   [Primitive.Compare]: { op: CompareOp };
   [Primitive.Transpose]: { perm: number[] };
@@ -97,6 +102,14 @@ export function reciprocal(x: TracerValue) {
 
 export function stopGradient(x: TracerValue) {
   return bind1(Primitive.StopGradient, [x]);
+}
+
+export function cast(x: TracerValue, dtype: DType) {
+  return bind1(Primitive.Cast, [x], { dtype });
+}
+
+export function bitcast(x: TracerValue, dtype: DType) {
+  return bind1(Primitive.Bitcast, [x], { dtype });
 }
 
 export function sin(x: TracerValue) {
@@ -499,6 +512,12 @@ export abstract class Tracer {
    */
   reshape(shape: number | number[]): this {
     return reshape(this, shape) as this;
+  }
+
+  /** Copy the array and cast to a specified dtype. */
+  astype(dtype: DType): this {
+    if (this.dtype === dtype) return this; // No-op.
+    return cast(this, dtype) as this;
   }
 
   // Below this line are composite operations built from primitives.

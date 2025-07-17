@@ -10,6 +10,20 @@ export enum DType {
   Complex64 = "complex64", // TODO: unimplemented
 }
 
+export const byteWidth = (dtype: DType): number => {
+  switch (dtype) {
+    case DType.Float32:
+    case DType.Int32:
+    case DType.Uint32:
+    case DType.Bool:
+      return 4;
+    case DType.Complex64:
+      return 8; // Two float32s.
+    default:
+      throw new TypeError(`Unknown dtype: ${dtype}`);
+  }
+};
+
 export const isFloatDtype = (dtype: DType) =>
   dtype === DType.Float32 || dtype === DType.Complex64;
 
@@ -33,6 +47,16 @@ export class AluExp implements FpHashable {
   ) {
     if (AluGroup.RequiredFloat.has(op) && !isFloatDtype(dtype)) {
       throw new TypeError(`Unsupported dtype for ${op}: ${dtype}`);
+    }
+    if (
+      op === AluOp.Bitcast &&
+      (dtype === DType.Bool ||
+        src[0].dtype === DType.Bool ||
+        byteWidth(dtype) !== byteWidth(src[0].dtype))
+    ) {
+      throw new TypeError(
+        `Bitcast from ${src[0].dtype} to ${dtype} is not supported`,
+      );
     }
   }
 
@@ -75,6 +99,10 @@ export class AluExp implements FpHashable {
   static cast(dtype: DType, a: AluExp): AluExp {
     if (a.dtype === dtype) return a;
     return new AluExp(AluOp.Cast, dtype, [a]);
+  }
+  static bitcast(dtype: DType, a: AluExp): AluExp {
+    if (a.dtype === dtype) return a;
+    return new AluExp(AluOp.Bitcast, dtype, [a]);
   }
   static cmplt(a: AluExp, b: AluExp): AluExp {
     return new AluExp(AluOp.Cmplt, DType.Bool, [a, b]);
@@ -537,7 +565,7 @@ export class AluExp implements FpHashable {
   evaluate(
     context: Record<string, any>,
     globals?: (gid: number, bufidx: number) => any,
-  ): any {
+  ): number {
     if (AluGroup.Binary.has(this.op) || AluGroup.Compare.has(this.op)) {
       const x = this.src[0].evaluate(context, globals);
       const y = this.src[1].evaluate(context, globals);
@@ -557,9 +585,9 @@ export class AluExp implements FpHashable {
         case AluOp.Max:
           return Math.max(x, y);
         case AluOp.Cmplt:
-          return x < y;
+          return Number(x < y);
         case AluOp.Cmpne:
-          return x != y;
+          return Number(x != y);
         default:
           throw new Error(`Missing implemementation for ${this.op}`);
       }
@@ -584,6 +612,21 @@ export class AluExp implements FpHashable {
           else if (this.dtype === DType.Float32) return x;
           else if (this.dtype === DType.Bool) return Number(Boolean(x));
           else throw new Error(`Unsupported cast to ${this.dtype}`);
+        case AluOp.Bitcast: {
+          const buf = new ArrayBuffer(byteWidth(this.dtype));
+          const view = new DataView(buf);
+          // Populate data in the byte view (all browsers use little-endian).
+          const fromType = this.src[0].dtype;
+          if (fromType === DType.Float32) view.setFloat32(0, x, true);
+          else if (fromType === DType.Int32) view.setInt32(0, x, true);
+          else if (fromType === DType.Uint32) view.setUint32(0, x, true);
+          else throw new Error(`Unsupported bitcast from ${fromType}`);
+          // Read the data in the target dtype.
+          if (this.dtype === DType.Float32) return view.getFloat32(0, true);
+          else if (this.dtype === DType.Int32) return view.getInt32(0, true);
+          else if (this.dtype === DType.Uint32) return view.getUint32(0, true);
+          else throw new Error(`Unsupported bitcast to ${this.dtype}`);
+        }
         default:
           throw new Error(`Missing implemementation for ${this.op}`);
       }
@@ -692,6 +735,9 @@ export class AluExp implements FpHashable {
       if (node.op === AluOp.Cast) {
         return `Cast<${node.dtype}>(${strip1(parts[0])})`;
       }
+      if (node.op === AluOp.Bitcast) {
+        return `Bitcast<${node.dtype}>(${strip1(parts[0])})`;
+      }
 
       return `${node.op}(${parts.map(strip1).join(", ")})`;
     });
@@ -752,6 +798,7 @@ export enum AluOp {
   Log = "Log",
   Reciprocal = "Reciprocal",
   Cast = "Cast",
+  Bitcast = "Bitcast",
 
   Cmplt = "Cmplt",
   Cmpne = "Cmpne",
@@ -784,6 +831,7 @@ export const AluGroup = {
     AluOp.Log,
     AluOp.Reciprocal,
     AluOp.Cast,
+    AluOp.Bitcast,
   ]),
   Compare: new Set([AluOp.Cmplt, AluOp.Cmpne]),
   Variable: new Set([
@@ -849,6 +897,20 @@ export class Kernel implements FpHashable {
 
   toString(): string {
     return this.pprint().toString();
+  }
+
+  /** The dtype of the values output by this kernel. */
+  get dtype(): DType {
+    if (this.reduction) {
+      return this.reduction.fusion.dtype;
+    } else {
+      return this.exp.dtype;
+    }
+  }
+
+  /** The number of bytes in the output array when evaluating this kernel. */
+  get bytes(): number {
+    return this.size * byteWidth(this.dtype);
   }
 }
 

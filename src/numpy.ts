@@ -151,6 +151,11 @@ export function size(a: ArrayLike, axis?: number): number {
   return axis === undefined ? iprod(s) : s[axis];
 }
 
+/** Convert an array to a specified dtype. */
+export function astype(a: ArrayLike, dtype: DType): Array {
+  return fudgeArray(a).astype(dtype);
+}
+
 /** Sum of the elements of the array over a given axis, or axes. */
 export function sum(
   a: ArrayLike,

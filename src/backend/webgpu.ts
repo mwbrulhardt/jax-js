@@ -348,6 +348,8 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
       else if (op === AluOp.Reciprocal) source = `(1.0 / ${a})`;
       else if (op === AluOp.Cast)
         source = `${dtypeToWgsl(dtype)}(${strip1(a)})`;
+      else if (op === AluOp.Bitcast)
+        source = `bitcast<${dtypeToWgsl(dtype)}>(${strip1(a)})`;
     } else if (op === AluOp.Where) {
       // select(f, t, cond) -> cond ? t : f
       source = `select(${strip1(gen(src[2]))}, ${strip1(gen(src[1]))}, ${strip1(gen(src[0]))})`;

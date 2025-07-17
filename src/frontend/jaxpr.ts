@@ -1,4 +1,4 @@
-import { DType } from "../alu";
+import { byteWidth, DType } from "../alu";
 import { ArrayLike } from "../numpy";
 import { PPrint } from "../pprint";
 import {
@@ -684,6 +684,20 @@ export const abstractEvalRules: { [P in Primitive]: AbstractEvalRule<P> } = {
   [Primitive.Neg]: vectorizedUnopAbstractEval,
   [Primitive.Reciprocal]: vectorizedUnopAbstractEval,
   [Primitive.StopGradient]: vectorizedUnopAbstractEval,
+  [Primitive.Cast]([x]: ShapedArray[], { dtype }: { dtype: DType }) {
+    return [new ShapedArray(x.shape, dtype)];
+  },
+  [Primitive.Bitcast]([x]: ShapedArray[], { dtype }: { dtype: DType }) {
+    if (x.dtype === DType.Bool || dtype === DType.Bool) {
+      throw new TypeError("Bitcast to/from bool is not allowed");
+    }
+    if (byteWidth(x.dtype) !== byteWidth(dtype)) {
+      throw new TypeError(
+        `Bitcast from ${x.dtype} to ${dtype} with different byte width`,
+      );
+    }
+    return [new ShapedArray(x.shape, dtype)];
+  },
   [Primitive.Sin]: vectorizedUnopAbstractEval,
   [Primitive.Cos]: vectorizedUnopAbstractEval,
   [Primitive.Exp]: vectorizedUnopAbstractEval,

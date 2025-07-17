@@ -4,6 +4,7 @@ import {
   AluExp,
   AluOp,
   AluVar,
+  byteWidth,
   DType,
   Kernel,
   Reduction,
@@ -301,7 +302,7 @@ export class Array extends Tracer {
     }
 
     const kernel = new Kernel(inputs.length, prod(finalShape), exp);
-    const output = this.#backend.malloc(kernel.size * 4);
+    const output = this.#backend.malloc(kernel.bytes);
     const pending = [...this.#pending, ...indices.flatMap((ar) => ar.#pending)];
     for (const exe of pending) exe.updateRc(+1);
     pending.push(new PendingExecute(this.#backend, kernel, inputs, [output]));
@@ -345,20 +346,22 @@ export class Array extends Tracer {
     return this.#reshape(this.#st.permute(perm));
   }
 
-  #unary(op: AluOp) {
+  #unary(op: AluOp, dtypeOutput?: DType) {
+    dtypeOutput ??= this.#dtype; // Default to current dtype unless changed.
+
     this.#check();
     // Short circuit if the array is already AluExp.
     if (this.#source instanceof AluExp) {
-      const exp = new AluExp(op, this.#dtype, [this.#source]);
-      return new Array(exp, this.#st, this.#dtype, this.#backend);
+      const exp = new AluExp(op, dtypeOutput, [this.#source]);
+      return new Array(exp, this.#st, dtypeOutput, this.#backend);
     }
 
     const indices = unravelAlu(this.#st.shape, AluVar.gidx);
-    const exp = new AluExp(op, this.#dtype, [
+    const exp = new AluExp(op, dtypeOutput, [
       AluExp.globalView(this.#dtype, 0, this.#st, indices),
     ]);
     const kernel = new Kernel(1, this.#st.size, exp);
-    const output = this.#backend.malloc(kernel.size * 4);
+    const output = this.#backend.malloc(kernel.bytes);
     const pending = [...this.#pending];
     for (const exe of pending) exe.updateRc(+1);
     pending.push(
@@ -369,7 +372,7 @@ export class Array extends Tracer {
     return new Array(
       output,
       ShapeTracker.fromShape(this.shape),
-      this.#dtype,
+      dtypeOutput,
       this.#backend,
       pending,
     );
@@ -464,7 +467,7 @@ export class Array extends Tracer {
 
     const exp = custom(src);
     const kernel = new Kernel(inputs.length, arrays[0].#st.size, exp);
-    const output = backend.malloc(kernel.size * 4);
+    const output = backend.malloc(kernel.bytes);
     const pending = new Set([...arrays.flatMap((ar) => ar.#pending)]);
     for (const exe of pending) exe.updateRc(+1);
     pending.add(new PendingExecute(backend, kernel, inputs, [output]));
@@ -511,7 +514,7 @@ export class Array extends Tracer {
     }
 
     const kernel = new Kernel(inputs.length, newSize, exp, reduction);
-    const output = this.#backend.malloc(kernel.size * 4);
+    const output = this.#backend.malloc(kernel.bytes);
     const pending = [...this.#pending];
     for (const exe of pending) exe.updateRc(+1);
     pending.push(new PendingExecute(this.#backend, kernel, inputs, [output]));
@@ -540,7 +543,7 @@ export class Array extends Tracer {
     if (this.#source instanceof AluExp) {
       const exp = accessorAluExp(this.#dtype, this.#source, this.#st, indices);
       const kernel = new Kernel(0, this.#st.size, exp);
-      const output = this.#backend.malloc(kernel.size * 4);
+      const output = this.#backend.malloc(kernel.bytes);
       const pendingItem = new PendingExecute(
         this.#backend,
         kernel,
@@ -555,7 +558,7 @@ export class Array extends Tracer {
       if (this.#st.contiguous) return;
       const exp = accessorGlobal(this.#dtype, 0, this.#st, indices);
       const kernel = new Kernel(1, this.#st.size, exp);
-      const output = this.#backend.malloc(kernel.size * 4);
+      const output = this.#backend.malloc(kernel.bytes);
       const pendingItem = new PendingExecute(
         this.#backend,
         kernel,
@@ -609,7 +612,7 @@ export class Array extends Tracer {
       for (const p of pending) p.submit();
     }
     // While the array is contiguous, it might not be the whole buffer.
-    const byteCount = 4 * prod(this.shape);
+    const byteCount = byteWidth(this.#dtype) * prod(this.shape);
     const buf = await this.#backend.read(this.#source as Slot, 0, byteCount);
     this.dispose();
     return this.dtype === DType.Float32
@@ -651,7 +654,7 @@ export class Array extends Tracer {
       p.submit();
     }
     // While the array is contiguous, it might not be the whole buffer.
-    const byteCount = 4 * prod(this.shape);
+    const byteCount = byteWidth(this.#dtype) * prod(this.shape);
     const buf = this.#backend.readSync(this.#source as Slot, 0, byteCount);
     this.dispose();
     return this.dtype === DType.Float32
@@ -699,6 +702,28 @@ export class Array extends Tracer {
       },
       [Primitive.StopGradient]([x]) {
         return [x]; // Stop gradient is a no-op, just return the input.
+      },
+      [Primitive.Cast]([x], { dtype }) {
+        return [x.#unary(AluOp.Cast, dtype)];
+      },
+      [Primitive.Bitcast]([x], { dtype }) {
+        if (x.dtype === DType.Bool || dtype === DType.Bool) {
+          throw new TypeError("Bitcast to/from bool is not allowed");
+        }
+        if (x.dtype === dtype) return [x];
+        if (byteWidth(x.dtype) !== byteWidth(dtype)) {
+          throw new TypeError(
+            `Bitcast from ${x.dtype} to ${dtype} with different byte width`,
+          );
+        }
+        if (x.#source instanceof AluExp) {
+          return [x.#unary(AluOp.Bitcast, dtype)];
+        } else {
+          // Just keep the same data / source, but change the dtype.
+          const y = new Array(x.#source, x.#st, dtype, x.#backend, x.#pending);
+          x.dispose();
+          return [y];
+        }
       },
       [Primitive.Sin]([x]) {
         return [x.#unary(AluOp.Sin)];

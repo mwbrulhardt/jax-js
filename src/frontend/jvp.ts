@@ -1,4 +1,4 @@
-import { AluOp } from "../alu";
+import { AluOp, isFloatDtype } from "../alu";
 import {
   JsTree,
   flatten as treeFlatten,
@@ -9,7 +9,9 @@ import { pureArray, zerosLike } from "./array";
 import {
   AbstractValue,
   bind,
+  bitcast,
   broadcast,
+  cast,
   compare,
   cos,
   exp,
@@ -128,6 +130,21 @@ const jvpRules: { [P in Primitive]: JvpRule<P> } = {
     dx.dispose();
     const zeroGradient = zerosLike(x); // Stop gradient flows for x.
     return [[x], [zeroGradient]];
+  },
+  [Primitive.Cast]([x], [dx], { dtype }) {
+    if (x.dtype === dtype) return [[x], [dx]]; // No-op if dtype is the same.
+    // If floating-point, cast to the new dtype. Otherwise discard the tangent.
+    if (isFloatDtype(dtype) && isFloatDtype(x.dtype)) {
+      return [[cast(x, dtype)], [cast(dx, dtype)]];
+    } else {
+      dx.dispose();
+      return [[cast(x, dtype)], [zerosLike(x)]];
+    }
+  },
+  [Primitive.Bitcast]([x], [dx], { dtype }) {
+    if (x.dtype === dtype) return [[x], [dx]]; // No-op if dtype is the same.
+    dx.dispose(); // Non-differentiable operation.
+    return [[bitcast(x, dtype)], [zerosLike(x)]];
   },
   [Primitive.Sin]([x], [dx]) {
     return [[sin(x.ref)], [cos(x).mul(dx)]];
