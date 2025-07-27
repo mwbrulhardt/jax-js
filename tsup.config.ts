@@ -1,19 +1,19 @@
 import { readdir } from "node:fs/promises";
 
-import { defineConfig, type Options } from "tsdown";
+import { defineConfig, type Options } from "tsup";
 
-const watchMode = process.env.TSDOWN_WATCH_MODE === "1";
+const watchMode = process.env.TSUP_WATCH_MODE === "1";
 
 // Common options for all packages.
 const opts: Options = {
-  external: (id: string) => {
-    // Externalize all imports by default, except for runtime helpers generated
-    // by the compiler / bundler toolchain.
-    if (id.startsWith("@oxc-project/runtime")) return false;
-    return Boolean(id.match(/^[^./]/));
-  },
+  // Externalize all imports by default, except for runtime helpers generated
+  // by the compiler / bundler toolchain.
+  entry: ["src/index.ts"],
+  external: [/^[^./]/],
   format: ["cjs", "esm"],
   platform: "browser",
+  dts: true,
+  clean: true,
 };
 
 export default defineConfig([
