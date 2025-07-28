@@ -1269,8 +1269,8 @@ export function linspace(
   return new Array(exp, st, dtype, getBackend(device));
 }
 
-/** Translate a `CompareOp` into an `AluExp` on two sub-expressions. */
 export function aluCompare(a: AluExp, b: AluExp, op: CompareOp): AluExp {
+  // Translate a `CompareOp` into an `AluExp` on two sub-expressions.
   switch (op) {
     case CompareOp.Greater:
       // `x > y` is equivalent to `x != y && !(x < y)`

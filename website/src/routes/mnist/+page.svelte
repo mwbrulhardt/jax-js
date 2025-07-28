@@ -325,9 +325,9 @@
     </p>
 
     <p class="mb-4">
-      The neural network is a fully-connected, 3-layer neural network trained
-      with Adam(lr=0.001). Each epoch has 60 randomized batches, with 1000
-      images each.
+      The model is a fully-connected, 3-layer neural network trained with
+      Adam(lr=0.001). Each epoch has 60 randomized batches, with 1000 images
+      each.
     </p>
 
     <p class="mb-4 text-sm">
