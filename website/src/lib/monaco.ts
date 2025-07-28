@@ -1,4 +1,5 @@
 import jaxTypesSrc from "@jax-js/jax/dist/index.d.ts?raw";
+import optaxTypesSrc from "@jax-js/optax/dist/index.d.ts?raw";
 import * as monaco from "monaco-editor";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -41,6 +42,10 @@ monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
 monaco.languages.typescript.typescriptDefaults.addExtraLib(
   jaxTypesSrc,
   "file:///node_modules/@jax-js/jax/index.d.ts",
+);
+monaco.languages.typescript.typescriptDefaults.addExtraLib(
+  optaxTypesSrc,
+  "file:///node_modules/@jax-js/optax/index.d.ts",
 );
 
 export default monaco;

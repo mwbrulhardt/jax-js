@@ -99,7 +99,7 @@ pnpm test
 - [x] Features for neural networks
   - [ ] Convolution
   - [x] Random and initializers
-  - [ ] Optimizers (optax package?)
+  - [x] Optimizers (optax package?)
 - [ ] Wasm backend (needs malloc)
   - [ ] SIMD support for Wasm backend
 - [ ] Device switching with `.to()` between webgpu/cpu/wasm

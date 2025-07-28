@@ -101,6 +101,7 @@ console.log(jaxpr.toString());
     running = true;
 
     const jax = await import("@jax-js/jax");
+    const optax = await import("@jax-js/optax");
     const ts = await import("typescript");
     const { rollup } = await import("@rollup/browser");
 
@@ -151,7 +152,7 @@ console.log(jaxpr.toString());
       const bundle = await rollup({
         input: "index.ts",
         plugins: [typescriptPlugin, virtualPlugin],
-        external: ["@jax-js/jax"],
+        external: ["@jax-js/jax", "@jax-js/optax"],
       });
 
       // We use the "system" format because it allows you to use async/await.
@@ -176,7 +177,7 @@ console.log(jaxpr.toString());
         .constructor as any;
 
       await new AsyncFunction("_MODULES", "console", bundledCode)(
-        { "@jax-js/jax": jax },
+        { "@jax-js/jax": jax, "@jax-js/optax": optax },
         mockConsole,
       );
     } catch (e: any) {
