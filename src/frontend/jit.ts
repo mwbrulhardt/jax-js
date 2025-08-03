@@ -521,6 +521,10 @@ const jitRules: { [P in Primitive]: JitRule<P> } = {
       axis: [cs.ndim - 1],
     });
   },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  [Primitive.Conv](nargs, [lhs, rhs], [lhsShape, rhsShape], params) {
+    throw new Error("XXX Conv JIT");
+  },
   [Primitive.Compare]: broadcastedJit(([a, b], { op }) => aluCompare(a, b, op)),
   [Primitive.Where]: broadcastedJit(([cond, a, b]) => AluExp.where(cond, a, b)),
   [Primitive.Transpose]: reshapeJit((st, { perm }) => st.permute(perm)),
@@ -575,10 +579,11 @@ function splitGraphDataflow(backend: Backend, jaxpr: Jaxpr): Set<Var> {
       p1NextBlack.set(v, v);
     }
   }
+  const reducePrimitives = [Primitive.Reduce, Primitive.Dot, Primitive.Conv];
   for (let i = jaxpr.eqns.length - 1; i >= 0; i--) {
     const eqn = jaxpr.eqns[i];
     if (
-      eqn.primitive === Primitive.Reduce ||
+      reducePrimitives.includes(eqn.primitive) ||
       eqn.outBinders.some((v) => blackNodes.has(v))
     ) {
       for (const v of eqn.outBinders) {

@@ -692,6 +692,10 @@ const transposeRules: Partial<{ [P in Primitive]: TransposeRule<P> }> = {
       y instanceof UndefPrimal ? unbroadcast(mul(x as Tracer, ct), y) : null,
     ];
   },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  [Primitive.Conv]([ct], [x, y], params) {
+    throw new Error("XXX Conv transpose rule is not implemented yet");
+  },
   [Primitive.Where]([ct], [cond, x, y]) {
     // Cotangent should be zero where cond doesn't apply.
     const cts: (Tracer | null)[] = [null, null, null];

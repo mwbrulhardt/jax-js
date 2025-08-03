@@ -21,6 +21,7 @@ import {
   recursiveFlatten,
   rep,
 } from "../utils";
+import { checkConvShape } from "./convolution";
 import {
   CompareOp,
   getAval,
@@ -797,6 +798,10 @@ export class Array extends Tracer {
             { reduceAxis: true },
           ),
         ];
+      },
+      [Primitive.Conv]([x, y], params) {
+        checkConvShape(x.shape, y.shape, params);
+        throw new Error("XXX Conv operation is not implemented yet");
       },
       [Primitive.Compare]([x, y], { op }) {
         const custom = ([x, y]: AluExp[]) => aluCompare(x, y, op);

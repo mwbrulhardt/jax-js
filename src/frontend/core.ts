@@ -7,6 +7,7 @@ import {
   unflatten as treeUnflatten,
 } from "../tree";
 import { checkAxis, DEBUG, isNumberPair, prod, range, rep } from "../utils";
+import type { ConvParams } from "./convolution";
 import type { Jaxpr } from "./jaxpr";
 
 /**
@@ -38,7 +39,8 @@ export enum Primitive {
   Min = "min",
   Max = "max",
   Reduce = "reduce",
-  Dot = "dot",
+  Dot = "dot", // sum(x*y, axis=-1)
+  Conv = "conv", // see lax.conv_general_dilated
   Compare = "compare",
   Where = "where",
   Transpose = "transpose",
@@ -51,11 +53,11 @@ export enum Primitive {
   JitCall = "jit_call",
 }
 
-interface PrimitiveParamsImpl
-  extends Record<Primitive, Record<string, unknown>> {
+interface PrimitiveParamsImpl extends Record<Primitive, Record<string, any>> {
   [Primitive.Cast]: { dtype: DType };
   [Primitive.Bitcast]: { dtype: DType };
   [Primitive.Reduce]: { op: AluOp; axis: number[] };
+  [Primitive.Conv]: ConvParams;
   [Primitive.Compare]: { op: CompareOp };
   [Primitive.Transpose]: { perm: number[] };
   [Primitive.Broadcast]: { shape: number[]; axis: number[] };
@@ -178,7 +180,24 @@ export function reduce(
 }
 
 export function dot(x: TracerValue, y: TracerValue) {
-  return bind1(Primitive.Dot, [x, y]); // reduce(x*y, -1)
+  return bind1(Primitive.Dot, [x, y]);
+}
+
+export function conv(x: Tracer, y: Tracer, params: Partial<ConvParams>) {
+  if (x.ndim !== y.ndim) {
+    throw new Error(
+      `conv() requires inputs with the same number of dimensions, got ${x.ndim} and ${y.ndim}`,
+    );
+  }
+  const n = x.ndim - 2;
+  if (n < 0) throw new Error("conv() requires at least 2D inputs");
+  // conv shape check is delayed until interpretation, to avoid circular imports.
+  return bind1(Primitive.Conv, [x, y], {
+    strides: params.strides ?? rep(n, 1),
+    padding: params.padding ?? rep(n, [0, 0]),
+    lhsDilation: params.lhsDilation ?? rep(n, 1),
+    rhsDilation: params.rhsDilation ?? rep(n, 1),
+  });
 }
 
 export function compare(x: TracerValue, y: TracerValue, op: CompareOp) {
@@ -313,7 +332,7 @@ export function gather(
   return bind1(Primitive.Gather, [x, ...indices], { axis, outDim });
 }
 
-function bind1<P extends Primitive>(
+export function bind1<P extends Primitive>(
   prim: P,
   args: TracerValue[],
   params: PrimitiveParams<P> = {} as any,

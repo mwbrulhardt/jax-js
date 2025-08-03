@@ -9,11 +9,11 @@ import { pureArray, zerosLike } from "./array";
 import {
   AbstractValue,
   bind,
+  bind1,
   bitcast,
   broadcast,
   cast,
   cos,
-  dot,
   exp,
   flattenFun,
   fullRaise,
@@ -109,6 +109,17 @@ function linearTangentsJvp<P extends Primitive>(primitive: P): JvpRule<P> {
   };
 }
 
+/** Rule for product of gradients in bilinear operations. */
+function bilinearTangentsJvp<P extends Primitive>(primitive: P): JvpRule<P> {
+  return ([x, y], [dx, dy], params) => {
+    const primal = bind1(primitive, [x.ref, y.ref], params);
+    const tangent = bind1(primitive, [x, dy], params).add(
+      bind1(primitive, [dx, y], params),
+    ); // (xy)' = xy' + x'y
+    return [[primal], [tangent]];
+  };
+}
+
 /** Rule that zeros out any tangents. */
 function zeroTangentsJvp<P extends Primitive>(primitive: P): JvpRule<P> {
   return (primals, tangents, params) => {
@@ -120,9 +131,7 @@ function zeroTangentsJvp<P extends Primitive>(primitive: P): JvpRule<P> {
 
 const jvpRules: { [P in Primitive]: JvpRule<P> } = {
   [Primitive.Add]: linearTangentsJvp(Primitive.Add),
-  [Primitive.Mul]([x, y], [dx, dy]) {
-    return [[x.ref.mul(y.ref)], [x.mul(dy).add(dx.mul(y))]];
-  },
+  [Primitive.Mul]: bilinearTangentsJvp(Primitive.Mul),
   [Primitive.Idiv]: zeroTangentsJvp(Primitive.Idiv),
   [Primitive.Neg]: linearTangentsJvp(Primitive.Neg),
   [Primitive.Reciprocal]([x], [dx]) {
@@ -201,10 +210,8 @@ const jvpRules: { [P in Primitive]: JvpRule<P> } = {
       throw new Error(`JVP rule not implemented for reduce op: ${op}`);
     }
   },
-  [Primitive.Dot]([x, y], [dx, dy]) {
-    // d(dot(x, y)) = dot(dx, y) + dot(x, dy)
-    return [[dot(x.ref, y.ref)], [dot(dx, y).add(dot(x, dy))]];
-  },
+  [Primitive.Dot]: bilinearTangentsJvp(Primitive.Dot),
+  [Primitive.Conv]: bilinearTangentsJvp(Primitive.Conv),
   [Primitive.Compare]: zeroTangentsJvp(Primitive.Compare),
   [Primitive.Where]([cond, x, y], [dcond, dx, dy]) {
     dcond.dispose();
