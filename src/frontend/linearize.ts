@@ -16,6 +16,7 @@ import {
   add,
   bind,
   broadcast,
+  conv,
   flattenFun,
   flip,
   fullRaise,
@@ -692,9 +693,41 @@ const transposeRules: Partial<{ [P in Primitive]: TransposeRule<P> }> = {
       y instanceof UndefPrimal ? unbroadcast(mul(x as Tracer, ct), y) : null,
     ];
   },
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  [Primitive.Conv]([ct], [x, y], params) {
-    throw new Error("XXX Conv transpose rule is not implemented yet");
+  [Primitive.Conv]([ct], [lhs, rhs], params) {
+    if (lhs instanceof UndefPrimal === rhs instanceof UndefPrimal)
+      throw new NonlinearError(Primitive.Conv);
+    // See rules for transposing a convolution in `convolution.ts`.
+    const rev01 = [1, 0, ...range(2, ct.ndim)];
+    if (lhs instanceof UndefPrimal) {
+      // Transpose to LHS (activations).
+      let newKernel = rhs as Tracer;
+      newKernel = transpose(newKernel, rev01); // Reverse in <-> out channels.
+      newKernel = flip(newKernel, range(2, newKernel.ndim)); // Flip spatial dimensions.
+      const result = conv(ct, newKernel, {
+        strides: params.lhsDilation,
+        padding: params.padding.map<[number, number]>(([pl, pr], i) => {
+          // dilated kernel_size in this dimension
+          const dilatedKernel =
+            (rhs.aval.shape[i + 2] - 1) * params.rhsDilation[i] + 1;
+          return [dilatedKernel - 1 - pl, dilatedKernel - 1 - pr];
+        }),
+        lhsDilation: params.strides,
+        rhsDilation: params.rhsDilation,
+      });
+      return [result, null];
+    } else {
+      // Transpose to RHS (filter).
+      const newLhs = transpose(lhs as Tracer, rev01); // Reverse batch <-> in channels.
+      const newRhs = transpose(ct, rev01); // Reverse batch <-> out channels.
+      let result = conv(newLhs, newRhs, {
+        strides: params.rhsDilation,
+        padding: params.padding,
+        lhsDilation: params.lhsDilation,
+        rhsDilation: params.strides,
+      });
+      result = transpose(result, rev01); // Reverse in <-> out channels.
+      return [null, result];
+    }
   },
   [Primitive.Where]([ct], [cond, x, y]) {
     // Cotangent should be zero where cond doesn't apply.

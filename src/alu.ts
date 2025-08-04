@@ -859,6 +859,16 @@ export class AluExp implements FpHashable {
     });
     return result;
   }
+
+  /** Rewrite GlobalView operations to GlobalIndex operations. */
+  rewriteGlobalViews(): AluExp {
+    return this.rewrite((exp) => {
+      if (exp.op === AluOp.GlobalView) {
+        const [gid, st] = exp.arg as [number, ShapeTracker];
+        return accessorGlobal(exp.dtype, gid, st, exp.src);
+      }
+    });
+  }
 }
 
 /** Symbolic form for each mathematical operation. */

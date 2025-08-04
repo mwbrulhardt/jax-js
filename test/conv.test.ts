@@ -1,6 +1,14 @@
 // Tests for convolution-related operations.
 
-import { devices, init, jit, lax, numpy as np, setDevice } from "@jax-js/jax";
+import {
+  devices,
+  grad,
+  init,
+  jit,
+  lax,
+  numpy as np,
+  setDevice,
+} from "@jax-js/jax";
 import { beforeEach, expect, suite, test } from "vitest";
 
 const devicesAvailable = await init();
@@ -74,5 +82,36 @@ suite.each(devices)("device:%s", (device) => {
       [34, 17],
       [62, 31],
     ]);
+  });
+
+  test("grad of 0d convolution", () => {
+    const x = np.array([
+      [1, 2],
+      [3, 4],
+      [5, 8],
+    ]);
+    const y = np.array([
+      [6, 4],
+      [3, 2],
+    ]);
+    const f = (x: np.Array, y: np.Array) =>
+      lax.convGeneralDilated(x, y, [], "VALID").sum();
+    expect(grad(f)(x, y).js()).toEqual([
+      [9, 6],
+      [9, 6],
+      [9, 6],
+    ]);
+  });
+
+  test("grad of 1d convolution", () => {
+    const f = (x: np.Array, y: np.Array) =>
+      lax.convGeneralDilated(x, y, [1], "SAME").slice(0, 0, 3);
+    const x = np.array([[[1, 2, 3, 4, 5, 6, 7]]]);
+    const y = np.array([[[2, 0.5, -1]]]);
+    const dx = grad(f)(x.ref, y.ref);
+    expect(dx.slice(0, 0).js()).toEqual([0, 0, 2, 0.5, -1, 0, 0]);
+
+    const dy = grad((y: np.Array, x: np.Array) => f(x, y))(y, x);
+    expect(dy.slice(0, 0).js()).toEqual([3, 4, 5]);
   });
 });

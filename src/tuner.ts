@@ -22,7 +22,7 @@
  * https://github.com/tinygrad/tinygrad/blob/685d5c46df/tinygrad/codegen/heuristic.py
  */
 
-import { accessorGlobal, AluExp, AluOp, AluVar, DType, Kernel } from "./alu";
+import { AluExp, AluOp, AluVar, DType, Kernel } from "./alu";
 import { ShapeTracker, unravelAlu } from "./shape";
 import { DEBUG, deepEqual, lexCompare, prod, range } from "./utils";
 
@@ -193,16 +193,7 @@ export function tuneNullopt(kernel: Kernel): TuneResult {
   if (kernel.reduction)
     vars.ridx = AluExp.special(DType.Int32, "ridx", kernel.reduction.size);
   return {
-    exp: kernel.exp
-      .rewrite((exp) => {
-        if (exp.op === AluOp.GlobalView) {
-          const gid: number = exp.arg[0];
-          const st: ShapeTracker = exp.arg[1];
-          return accessorGlobal(exp.dtype, gid, st, exp.src);
-        }
-      })
-      .substitute(vars)
-      .simplify(),
+    exp: kernel.exp.substitute(vars).rewriteGlobalViews().simplify(),
     outputIdxExp: AluExp.special(DType.Int32, "gidx", kernel.size),
     threadCount: kernel.size,
     size: {
@@ -355,13 +346,15 @@ export function tuneWebgpu(kernel: Kernel): TuneResult {
     addIndices(s, AluVar.upcast);
   }
 
-  const newExp = exp.rewrite((exp) => {
-    if (exp.op === AluOp.GlobalView) {
-      const gid: number = exp.arg[0];
-      const st: ShapeTracker = exp.arg[1];
-      return accessorGlobal(exp.dtype, gid, st.compose(dim.st), indices);
-    }
-  });
+  // Substitute old values of AluVar.gidx and AluVar.ridx.
+  const [iexpr, vexpr] = dim.st.toAluExp(indices);
+  if (vexpr.min !== 1) throw new Error("Invariant violation: vexpr !== true");
+  const newExp = exp
+    .substitute({
+      gidx: AluExp.idiv(iexpr, AluExp.i32(reduction.size)),
+      ridx: AluExp.mod(iexpr, AluExp.i32(reduction.size)),
+    })
+    .rewriteGlobalViews();
 
   const outputGidx = dim.outputSt.shape.slice(0, dim.groups);
   const outputUpcast = dim.outputSt.shape.slice(dim.groups);
