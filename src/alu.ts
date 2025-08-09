@@ -477,6 +477,22 @@ export class AluExp implements FpHashable {
     ) {
       return src[0];
     }
+    // (x % A) % B => x % min(A, B), if A|B or B|A
+    if (
+      op === AluOp.Mod &&
+      src[0].op === AluOp.Mod &&
+      src[1].#isConstInt() &&
+      src[0].src[1].#isConstInt()
+    ) {
+      const A: number = src[0].src[1].arg;
+      const B: number = src[1].arg;
+      if (A > 0 && B > 0 && (A % B === 0 || B % A === 0)) {
+        return AluExp.mod(
+          src[0].src[0],
+          AluExp.const(this.dtype, Math.min(A, B)),
+        ).simplify();
+      }
+    }
     // (...) * A + (...) % A
     if (
       op === AluOp.Add &&
@@ -516,7 +532,8 @@ export class AluExp implements FpHashable {
           const A: number = numer.src[i].arg;
           if (A % B === 0) {
             let ret = numer.src[1 - i]; // x
-            if (A / B !== 1) ret = AluExp.mul(ret, AluExp.i32(A / B));
+            if (A / B !== 1)
+              ret = AluExp.mul(ret, AluExp.const(ret.dtype, A / B));
             return ret.simplify(cache);
           }
         }
@@ -530,10 +547,11 @@ export class AluExp implements FpHashable {
             const A: number = numer.src[j].src[i].arg;
             if (A % B === 0) {
               let ret = numer.src[j].src[1 - i]; // x
-              if (A / B !== 1) ret = AluExp.mul(ret, AluExp.i32(A / B));
+              if (A / B !== 1)
+                ret = AluExp.mul(ret, AluExp.const(ret.dtype, A / B));
               ret = AluExp.add(
                 ret,
-                AluExp.idiv(numer.src[1 - j], AluExp.i32(B)),
+                AluExp.idiv(numer.src[1 - j], AluExp.const(ret.dtype, B)),
               );
               return ret.simplify(cache);
             }
