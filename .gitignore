@@ -6,6 +6,7 @@ docs-json/
 .svelte-kit/
 
 .vscode/
+.claude/
 
 # Test files from vitest
 __screenshots__/

@@ -154,13 +154,27 @@
     };
   }
 
+  // Training metrics
   let trainMetrics = $state<{ iteration: number; loss: number }[]>([]);
   let testMetrics = $state<{ epoch: number; loss: number; acc: number }[]>([]);
 
+  // Training and inference state
   let latestParams: Params | null = null;
   let probs: number[] = $state.raw([]);
   let running = $state(false);
   let stopping = false;
+
+  // Settings
+  let learningRate = $state(0.001);
+  let logLearningRate = $state(Math.log10(0.001)); // -3 for 0.001
+  let showSettings = $state(false);
+
+  $effect(() => {
+    learningRate = parseFloat(Math.pow(10, logLearningRate).toFixed(6));
+  });
+  $effect(() => {
+    logLearningRate = Math.log10(learningRate);
+  });
 
   let Model: ModelType = undefined!; // Initialized in $effect below.
   let batchSize: number = undefined!;
@@ -207,7 +221,7 @@
     const duration = performance.now() - startTime;
     log(`=> Data loaded in ${duration.toFixed(1)} ms`);
 
-    const solver = adam(1e-3);
+    const solver = adam(learningRate);
     let optState = solver.init(tree.ref(params));
     let updates: Params;
 
@@ -447,8 +461,8 @@
 
     <p class="mb-4">
       The model is a 3-layer MLP or convolutional neural network trained with
-      Adam(lr=0.001). Each epoch has 60 (MLP) or 300 (ConvNet) randomized
-      batches, with 60,000 images in total in the train set.
+      Adam. Each epoch has 60 (MLP) or 300 (ConvNet) randomized batches, with
+      60,000 images in total in the train set.
     </p>
 
     <p class="mb-4 text-sm">
@@ -459,19 +473,73 @@
       >-enabled browser. Works best on Chrome.
     </p>
 
-    <div class="flex gap-2">
-      <select
-        bind:value={selectedModel}
-        onchange={() => changeModelType(selectedModel)}
-        disabled={running}
-      >
-        <option value="MLP">MLP</option>
-        <option value="ConvNet">ConvNet</option>
-      </select>
-      {#if !running}
-        <button onclick={run}>Run</button>
-      {:else}
-        <button onclick={stop}>Stop</button>
+    <div class="mb-8">
+      <div class="flex gap-2">
+        <select
+          bind:value={selectedModel}
+          onchange={() => changeModelType(selectedModel)}
+          disabled={running}
+        >
+          <option value="MLP">MLP</option>
+          <option value="ConvNet">ConvNet</option>
+        </select>
+        <button
+          onclick={() => (showSettings = !showSettings)}
+          class="text-sm flex items-center gap-1"
+        >
+          Settings
+          <span
+            class="transform transition-transform {showSettings
+              ? 'rotate-180'
+              : ''}"
+            style="font-size: 10px;">▼</span
+          >
+        </button>
+        {#if !running}
+          <button onclick={run}>Run</button>
+        {:else}
+          <button onclick={stop}>Stop</button>
+        {/if}
+      </div>
+
+      {#if showSettings}
+        <div class="mt-2 p-3 border rounded bg-gray-50">
+          <div class="flex items-center gap-3 mb-2">
+            <label for="learning-rate-slider" class="font-semibold text-sm"
+              >Learning rate:</label
+            >
+            <input
+              id="learning-rate-slider"
+              type="range"
+              min="-4"
+              max="-2"
+              step="0.01"
+              bind:value={logLearningRate}
+              class="w-32"
+              disabled={running}
+            />
+            <input
+              type="number"
+              min="0.0001"
+              max="0.01"
+              step="any"
+              bind:value={learningRate}
+              class="w-24 px-2 py-1 border rounded text-sm"
+              aria-label="Learning rate numerical input"
+              disabled={running}
+            />
+          </div>
+          <div class="flex justify-end">
+            <button
+              onclick={() => {
+                learningRate = 0.001;
+              }}
+              disabled={running}
+            >
+              Reset to default
+            </button>
+          </div>
+        </div>
       {/if}
     </div>
   </section>
@@ -550,7 +618,7 @@
   </div>
 
   <div
-    class="font-mono text-sm bg-gray-900 px-4 py-2 h-[600px] overflow-y-scroll mt-8"
+    class="font-mono text-sm rounded bg-gray-900 px-4 py-2 h-[600px] overflow-y-scroll mt-8"
   >
     {#each logs as log}
       <div class="text-white whitespace-pre-wrap">{log}</div>
@@ -562,10 +630,10 @@
   @reference "$app.css";
 
   button {
-    @apply border px-2 hover:bg-gray-100 active:scale-95;
+    @apply border rounded px-2 hover:bg-gray-100 active:scale-95;
   }
 
   select {
-    @apply border px-1 text-sm;
+    @apply border rounded px-1 text-sm;
   }
 </style>
