@@ -125,3 +125,137 @@ export function parse(data: Uint8Array | ArrayBuffer): File {
   }
   return file;
 }
+
+/**
+ * Convert a flat dictionary of tensors into a nested object.
+ *
+ * For example, take the case:
+ *
+ * ```js
+ * {
+ *   "layers.0.bias": b0,
+ *   "layers.0.weight": w0,
+ *   "layers.1.bias": b1,
+ *   "layers.1.weight": w1,
+ * }
+ * ```
+ *
+ * This would become:
+ *
+ * ```js
+ * {
+ *   layers: [
+ *     { bias: b0, weight: w0 },
+ *     { bias: b1, weight: w1 },
+ *   ],
+ * }
+ * ```
+ */
+export function toNested(tensors: { [key: string]: any }): any {
+  const isNumeric = (s: string) => /^\d+$/.test(s);
+
+  // Check if the top level should be an array
+  const keys = Object.keys(tensors);
+  const isTopLevelArray =
+    keys.length > 0 &&
+    keys.every((key) => {
+      const firstPart = key.split(".")[0];
+      return isNumeric(firstPart);
+    });
+
+  const result: any = isTopLevelArray ? [] : {};
+
+  for (const [key, value] of Object.entries(tensors)) {
+    if (!key) throw new Error("empty key in tensors list");
+
+    const parts = key.split(".");
+    let currentObj: any = result;
+    let currentPart: string | number = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      if (isNumeric(part)) {
+        if (!Object.hasOwn(currentObj, currentPart))
+          currentObj[currentPart] = [];
+        currentObj = currentObj[currentPart];
+        currentPart = parseInt(part, 10);
+      } else {
+        if (!Object.hasOwn(currentObj, currentPart))
+          currentObj[currentPart] = {};
+        currentObj = currentObj[currentPart];
+        currentPart = part;
+      }
+    }
+    currentObj[currentPart] = value;
+  }
+
+  return result;
+}
+
+/**
+ * Check if a value is a leaf node (not an object or array that should be traversed).
+ * A leaf is anything that is not a plain Object or Array.
+ */
+function isLeaf(value: any): boolean {
+  if (typeof value !== "object" || value === null) {
+    return true;
+  }
+  return !Array.isArray(value) && value.constructor !== Object;
+}
+
+/**
+ * Convert a nested object structure back into a flat dictionary of tensors.
+ *
+ * This is the inverse operation of `toNested`.
+ *
+ * For example:
+ *
+ * ```js
+ * {
+ *   layers: [
+ *     { bias: b0, weight: w0 },
+ *     { bias: b1, weight: w1 },
+ *   ],
+ * }
+ * ```
+ *
+ * Would become:
+ *
+ * ```js
+ * {
+ *   "layers.0.bias": b0,
+ *   "layers.0.weight": w0,
+ *   "layers.1.bias": b1,
+ *   "layers.1.weight": w1,
+ * }
+ * ```
+ */
+export function fromNested(
+  nested: any,
+  prefix: string = "",
+): { [key: string]: any } {
+  const result: { [key: string]: any } = {};
+
+  function flatten(obj: any, currentPrefix: string) {
+    if (isLeaf(obj)) {
+      if (!currentPrefix)
+        throw new Error("cannot have empty key in nested object");
+      result[currentPrefix] = obj;
+      return;
+    }
+
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        const newPrefix = currentPrefix ? `${currentPrefix}.${i}` : `${i}`;
+        flatten(obj[i], newPrefix);
+      }
+    } else {
+      for (const [key, value] of Object.entries(obj)) {
+        const newPrefix = currentPrefix ? `${currentPrefix}.${key}` : key;
+        flatten(value, newPrefix);
+      }
+    }
+  }
+
+  flatten(nested, prefix);
+  return result;
+}
