@@ -82,8 +82,16 @@
     const ts = await import("typescript");
     const { rollup } = await import("@rollup/browser");
 
+    mockConsole.clear();
+
     await jax.init();
-    jax.setDevice("webgpu");
+    try {
+      jax.setDevice("webgpu");
+    } catch (err: any) {
+      mockConsole.error(err);
+      mockConsole.warn(`WebGPU not supported, falling back to Wasm`);
+      jax.setDevice("wasm");
+    }
 
     const userCode = replEditor.getText();
 
@@ -123,8 +131,6 @@
     };
 
     try {
-      mockConsole.clear();
-
       // Use @rollup/browser to bundle the code.
       const bundle = await rollup({
         input: "index.ts",
