@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { page } from "$app/state";
 
@@ -34,21 +34,20 @@
     { title: "Mandelbrot set", code: src["./04-mandelbrot.ts"] },
   ];
 
-  let pageSelected = $derived.by(() => {
-    const str = page.url.searchParams.get("sample") ?? "0";
+  function getSampleFromUrl(url: URL) {
+    const str = url.searchParams.get("sample") ?? "0";
     const i = parseInt(str);
     if (Number.isInteger(i) && i >= 0 && i < codeSamples.length) return i;
     return 0;
-  });
-  // svelte-ignore state_referenced_locally
-  let selected = $state(pageSelected);
+  }
 
+  let selected = $state(getSampleFromUrl(page.url));
   let replEditor: ReplEditor;
 
   $effect(() => {
     // When selected changes, update the query string in the URL.
-    if (selected !== pageSelected) {
-      replaceState(page.url.pathname + `?sample=${selected}`, page.state);
+    if (selected !== getSampleFromUrl(page.url)) {
+      goto(page.url.pathname + `?sample=${selected}`, { replaceState: true });
     }
   });
 
