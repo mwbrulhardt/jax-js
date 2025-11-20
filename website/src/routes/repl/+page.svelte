@@ -7,7 +7,7 @@
   import type { Device, numpy as np } from "@jax-js/jax";
   import { SplitPane } from "@rich_harris/svelte-split-pane";
   import type { Plugin } from "@rollup/browser";
-  import { gunzipSync } from "fflate";
+  import { gunzipSync, gzipSync } from "fflate";
   import { Base64 } from "js-base64";
   import {
     AlertTriangleIcon,
@@ -108,20 +108,20 @@
   }
 
   async function handleShare() {
-    const { gzipSync } = await import("fflate");
     const code = replEditor.getText();
 
     // Encode the code as gzipped base64
     const encoded = new TextEncoder().encode(code);
-    const compressed = gzipSync(encoded);
+    const compressed = gzipSync(encoded, { mtime: 0 });
     const base64Content = Base64.fromUint8Array(compressed, true); // URL-safe base64
 
     const url = new URL(page.url.origin + page.url.pathname);
     url.searchParams.set("content", base64Content);
 
     try {
+      goto(url, { replaceState: true });
       await navigator.clipboard.writeText(url.toString());
-      mockConsole.log("Link copied to clipboard!");
+      mockConsole.info("Link copied to clipboard!");
     } catch (e: any) {
       mockConsole.error("Failed to copy link:", e);
     }
