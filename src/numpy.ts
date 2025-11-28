@@ -1,4 +1,4 @@
-import { AluOp, DType, isFloatDtype } from "./alu";
+import { AluOp, DType, isFloatDtype, promoteTypes } from "./alu";
 import {
   arange,
   Array,
@@ -28,11 +28,12 @@ export {
   array,
   DType,
   eye,
+  full,
   identity,
   linspace,
-  zeros,
   ones,
-  full,
+  promoteTypes,
+  zeros,
 };
 
 export const float32 = DType.Float32;

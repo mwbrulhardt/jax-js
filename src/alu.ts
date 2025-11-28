@@ -35,6 +35,46 @@ export const byteWidth = (dtype: DType): number => {
 export const isFloatDtype = (dtype: DType) =>
   dtype === DType.Float32 || dtype === DType.Float16;
 
+/**
+ * Promote two dtypes to their join according to the type lattice.
+ *
+ * When performing operations between arrays of different types, we need to
+ * promote both operands to a common type that can represent values from both
+ * input types. This follows JAX's type promotion rules.
+ *
+ * **Type lattice:**
+ * ```text
+ * bool -> uint32 -> int32 -> float16 -> float32
+ *  weak f* --^
+ * ```
+ *
+ * The asterisk f* is a weak type used for JS number constants. When creating
+ * arrays, JS numbers default to float32 but "weak" so they cast to the dtype of
+ * any array they are first combined with.
+ *
+ * **Examples:**
+ * - `promoteTypes(bool, int32) → int32`
+ * - `promoteTypes(uint32, int32) → int32`
+ * - `promoteTypes(int32, float16) → float16`
+ * - `promoteTypes(float16, float32) → float32`
+ * - `promoteTypes(uint32, float32) → float32`
+ */
+export function promoteTypes(dtype1: DType, dtype2: DType): DType {
+  if (dtype1 === dtype2) return dtype1;
+
+  // Define the promotion order in a linear chain (higher number = later in chain)
+  const rank: Record<DType, number> = {
+    [DType.Bool]: 0,
+    [DType.Uint32]: 1,
+    [DType.Int32]: 2,
+    [DType.Float16]: 3,
+    [DType.Float32]: 4,
+  };
+
+  // Take the type that appears later in the chain
+  return rank[dtype1] > rank[dtype2] ? dtype1 : dtype2;
+}
+
 export function dtypedArray(
   dtype: DType,
   data: Uint8Array<ArrayBuffer>,
