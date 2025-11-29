@@ -265,43 +265,33 @@ export class FpHash {
   }
 
   update(
-    ...values: (
-      | string
-      | boolean
-      | number
-      | bigint
-      | null
-      | undefined
-      | FpHashable
-    )[]
+    x: string | boolean | number | bigint | null | undefined | FpHashable,
   ): this {
-    for (const x of values) {
-      if (typeof x === "string") {
-        this.#update(BigInt(x.length));
-        for (let i = 0; i < x.length; i++) {
-          this.#update(BigInt(199 + x.charCodeAt(i)));
-        }
-      } else if (typeof x === "number") {
-        if (Number.isInteger(x)) {
-          this.#update(68265653n ^ BigInt(x));
-        } else {
-          _stagingbuf.setFloat64(0, x, true);
-          this.#update(_stagingbuf.getBigUint64(0, true));
-        }
-      } else if (typeof x === "boolean") {
-        this.#update(x ? 69069841n : 63640693n);
-      } else if (typeof x === "bigint") {
-        // When combining the output of another hash, must be nonlinear to avoid
-        // obvious collisions.
-        this.#update(x ^ 71657401n);
-      } else if (x === null) {
-        this.#update(37832657n);
-      } else if (x === undefined) {
-        this.#update(18145117n);
-      } else {
-        // If the object has a hash method, call it.
-        x.hash(this);
+    if (typeof x === "string") {
+      this.#update(BigInt(x.length));
+      for (let i = 0; i < x.length; i++) {
+        this.#update(BigInt(199 + x.charCodeAt(i)));
       }
+    } else if (typeof x === "number") {
+      if (Number.isInteger(x)) {
+        this.#update(68265653n ^ BigInt(x));
+      } else {
+        _stagingbuf.setFloat64(0, x, true);
+        this.#update(_stagingbuf.getBigUint64(0, true));
+      }
+    } else if (typeof x === "boolean") {
+      this.#update(x ? 69069841n : 63640693n);
+    } else if (typeof x === "bigint") {
+      // When combining the output of another hash, must be nonlinear to avoid
+      // obvious collisions.
+      this.#update(x ^ 71657401n);
+    } else if (x === null) {
+      this.#update(37832657n);
+    } else if (x === undefined) {
+      this.#update(18145117n);
+    } else {
+      // If the object has a hash method, call it.
+      x.hash(this);
     }
     return this;
   }
@@ -317,7 +307,9 @@ export class FpHash {
       | FpHashable
     )[]
   ): bigint {
-    return new FpHash().update(...values).value;
+    const h = new FpHash();
+    for (const x of values) h.update(x);
+    return h.value;
   }
 }
 

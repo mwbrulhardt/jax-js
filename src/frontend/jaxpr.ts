@@ -219,22 +219,21 @@ export class Jaxpr implements FpHashable {
       varIds.set(v, FpHash.hash(id, v.aval.dtype, ...v.aval.shape));
       return id;
     };
-    hasher.update(this.inBinders.length, ...this.inBinders.map(vi));
-    hasher.update(
-      this.eqns.length,
-      ...this.eqns.flatMap((eqn) => [
-        eqn.primitive,
-        eqn.inputs.length,
-        ...eqn.inputs.map((x) => (x instanceof Var ? vi(x) : x.value)),
-        JSON.stringify(eqn.params),
-        eqn.outBinders.length,
-        ...eqn.outBinders.map(vi),
-      ]),
-    );
-    hasher.update(
-      this.outs.length,
-      ...this.outs.map((x) => (x instanceof Var ? vi(x) : x.value)),
-    );
+    hasher.update(this.inBinders.length);
+    for (const x of this.inBinders) hasher.update(vi(x));
+    hasher.update(this.eqns.length);
+    for (const eqn of this.eqns) {
+      hasher.update(eqn.primitive);
+      hasher.update(eqn.inputs.length);
+      for (const x of eqn.inputs)
+        hasher.update(x instanceof Var ? vi(x) : x.value);
+      hasher.update(JSON.stringify(eqn.params));
+      hasher.update(eqn.outBinders.length);
+      for (const x of eqn.outBinders) hasher.update(vi(x));
+    }
+    hasher.update(this.outs.length);
+    for (const x of this.outs)
+      hasher.update(x instanceof Var ? vi(x) : x.value);
     return (this.#hash = hasher.value);
   }
 

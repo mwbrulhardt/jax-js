@@ -276,8 +276,11 @@ export class AluExp implements FpHashable {
   getHash(): bigint {
     if (this.#hash !== undefined) return this.#hash;
     const hasher = new FpHash();
-    hasher.update(this.op, this.dtype, JSON.stringify(this.arg));
-    hasher.update(this.src.length, ...this.src);
+    hasher.update(this.op);
+    hasher.update(this.dtype);
+    hasher.update(JSON.stringify(this.arg));
+    hasher.update(this.src.length);
+    for (const s of this.src) hasher.update(s);
     this.#hash = hasher.value;
     return this.#hash;
   }
@@ -546,15 +549,16 @@ export class AluExp implements FpHashable {
     // Cache this to avoid recomputing if it's called twice.
     if (this.#simplified !== undefined) return this.#simplified;
 
-    // Extra help: `cache` can be used cache across multiple calls.
+    // Extra help: `cache` can be used across multiple calls.
     const hash = this.getHash();
-    if (cache.has(hash)) {
-      return (this.#simplified = cache.get(hash)!);
+    const prevCachedValue = cache.get(hash);
+    if (prevCachedValue !== undefined) {
+      return (this.#simplified = prevCachedValue);
     }
     const simplified = this.#simplifyInner(cache);
     const simplifiedHash = simplified.getHash();
-    if (cache.has(simplifiedHash)) {
-      const prevSimplified = cache.get(simplifiedHash)!;
+    const prevSimplified = cache.get(simplifiedHash);
+    if (prevSimplified !== undefined) {
       cache.set(hash, prevSimplified);
       this.#simplified = prevSimplified;
       return prevSimplified;
@@ -1310,7 +1314,11 @@ export class Kernel implements FpHashable {
   }
 
   hash(state: FpHash): void {
-    state.update(this.nargs, this.size, this.exp, this.reduction);
+    state
+      .update(this.nargs)
+      .update(this.size)
+      .update(this.exp)
+      .update(this.reduction);
   }
 
   pprint(): PPrint {
@@ -1374,7 +1382,11 @@ export class Reduction implements FpHashable {
   }
 
   hash(state: FpHash): void {
-    state.update(this.dtype, this.op, this.size, this.epilogue);
+    state
+      .update(this.dtype)
+      .update(this.op)
+      .update(this.size)
+      .update(this.epilogue);
   }
 
   toString(): string {
