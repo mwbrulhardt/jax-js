@@ -130,7 +130,7 @@ Most operations behave the same way as they do in JAX.
 | `arcsin`              | 🟢      | transcendental                          |
 | `arcsinh`             | 🟠      |                                         |
 | `arctan`              | 🟢      | transcendental                          |
-| `arctan2`             | ⚪️      | alias of `atan2`                        |
+| `arctan2`             | 🟢      |                                         |
 | `arctanh`             | 🟠      |                                         |
 | `argmax`              | 🟢      |                                         |
 | `argmin`              | 🟢      |                                         |
@@ -150,7 +150,7 @@ Most operations behave the same way as they do in JAX.
 | `astype`              | 🟢      |                                         |
 | `atan`                | 🟢      |                                         |
 | `atanh`               | ⚪️      | alias of `arctanh`                      |
-| `atan2`               | 🟠      |                                         |
+| `atan2`               | 🟢      |                                         |
 | `atleast_1d`          | 🟠      |                                         |
 | `atleast_2d`          | 🟠      |                                         |
 | `atleast_3d`          | 🟠      |                                         |
@@ -263,7 +263,7 @@ Most operations behave the same way as they do in JAX.
 | `histogramdd`         | 🔴      |                                         |
 | `hsplit`              | 🟠      | `Array.slice` is supported              |
 | `hstack`              | 🟢      |                                         |
-| `hypot`               | 🟠      |                                         |
+| `hypot`               | 🟡      | implemented as `sqrt(x^2 + y^2)`        |
 | `i0`                  | 🔴      | transcendental                          |
 | `identity`            | 🟢      |                                         |
 | `iinfo`               | ⚪️      | Python-specific                         |

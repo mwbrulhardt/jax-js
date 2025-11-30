@@ -710,6 +710,14 @@ suite.each(devices)("device:%s", (device) => {
       const w = np.divide(x, y);
       expect(w.js()).toBeAllclose([0.25, 0.4, 0.5]);
     });
+
+    test("recip of 0 is infinity", () => {
+      const x = np.reciprocal(0);
+      expect(x.js()).toEqual(Infinity);
+
+      const y = np.array(9.0).div(0);
+      expect(y.js()).toEqual(Infinity);
+    });
   });
 
   suite("jax.numpy.exp()", () => {
@@ -1052,10 +1060,9 @@ suite.each(devices)("device:%s", (device) => {
 
   suite("jax.numpy.atan()", () => {
     test("arctan values", () => {
-      const vals = [-1000, -100, -10, -1, 0, 1, 10, 100, 1000];
+      const vals = [-1000, -100, -10, -1, 0, 1, 10, 100, 1000, Infinity];
       const atanvals: number[] = np.atan(np.array(vals)).js();
       for (let i = 0; i < vals.length; i++) {
-        console.log(vals, atanvals);
         expect(atanvals[i]).toBeCloseTo(Math.atan(vals[i]), 5);
       }
     });
@@ -1082,6 +1089,18 @@ suite.each(devices)("device:%s", (device) => {
       const dx = grad((x: np.Array) => np.asin(x).sum())(x);
       const expected = [2 / Math.sqrt(3), 1, 2 / Math.sqrt(3)];
       expect(dx.js()).toBeAllclose(expected);
+    });
+  });
+
+  suite("jax.numpy.atan2()", () => {
+    test("arctan2 values", () => {
+      // Test all four quadrants and special cases with various values
+      const y = [3, 5, -7, -2, 4, -6, 0, 0, 1.5, -2.5];
+      const x = [4, -2, -3, 8, 0, 0, 5, -9, 1.5, -2.5];
+      const result: number[] = np.atan2(np.array(y), np.array(x)).js();
+      for (let i = 0; i < y.length; i++) {
+        expect(result[i]).toBeCloseTo(Math.atan2(y[i], x[i]), 5);
+      }
     });
   });
 

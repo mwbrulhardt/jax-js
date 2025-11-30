@@ -19,6 +19,7 @@ import {
   zerosLike as zerosLikeUnfudged,
 } from "./frontend/array";
 import * as core from "./frontend/core";
+import { jit } from "./frontend/jaxpr";
 import * as vmapModule from "./frontend/vmap";
 import { checkAxis, deepEqual, prod as iprod, range, rep } from "./utils";
 
@@ -924,12 +925,50 @@ export function acos(x: ArrayLike): Array {
   return subtract(pi / 2, asin(x));
 }
 
-/** @function Alias of `jax.numpy.asin()`. */
-export const arcsin = asin;
+/**
+ * @function
+ * Return element-wise hypotenuse for the given legs of a right triangle.
+ *
+ * In the original NumPy/JAX implementation, this function is more numerically
+ * stable than sqrt(x1**2 + x2**2). We don't currently implement those stability
+ * improvements.
+ */
+export const hypot = jit((x1: Array, x2: Array) => {
+  return sqrt(square(x1).add(square(x2)));
+});
+
+/**
+ * @function
+ * Element-wise arc tangent of y/x with correct quadrant.
+ *
+ * Returns the angle in radians between the positive x-axis and the point (x, y).
+ * The result is in the range [-π, π].
+ *
+ * Uses numerically stable formulas:
+ * - When x >= 0: atan2(y, x) = 2 * atan(y / (sqrt(x^2 + y^2) + x))
+ * - When x < 0:  atan2(y, x) = 2 * atan((sqrt(x^2 + y^2) - x) / y)
+ *
+ * The output is ill-defined when both x and y are zero.
+ */
+export const atan2 = jit((y: Array, x: Array) => {
+  const r = sqrt(square(x.ref).add(square(y.ref)));
+  const xNeg = less(x.ref, 0);
+
+  // Select numerator and denominator based on sign of x
+  // When x >= 0: numer = y,     denom = r + x
+  // When x < 0:  numer = r - x, denom = y
+  const numer = where(xNeg.ref, r.ref.sub(x.ref), y.ref);
+  const denom = where(xNeg, y, r.add(x));
+
+  return atan(numer.div(denom)).mul(2);
+});
+
 /** @function Alias of `jax.numpy.acos()`. */
 export const arccos = acos;
 /** @function Alias of `jax.numpy.atan()`. */
 export const arctan = atan;
+/** @function Alias of `jax.numpy.atan2()`. */
+export const arctan2 = atan2;
 
 /** Element-wise subtraction, with broadcasting. */
 export function subtract(x: ArrayLike, y: ArrayLike): Array {
