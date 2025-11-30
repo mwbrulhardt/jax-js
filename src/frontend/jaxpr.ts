@@ -2,6 +2,7 @@ import { byteWidth, DType } from "../alu";
 import { type Device } from "../backend";
 import { ArrayLike } from "../numpy";
 import { PPrint } from "../pprint";
+import { type Pair } from "../shape";
 import {
   JsTreeDef,
   MapJsTree,
@@ -298,11 +299,22 @@ export class Jaxpr implements FpHashable {
           newEqns.push(eqn);
         }
       } else if (
-        (eqn.primitive === Primitive.Broadcast ||
+        ((eqn.primitive === Primitive.Broadcast ||
           eqn.primitive === Primitive.Reshape) &&
-        deepEqual(eqn.params.shape, eqn.inputs[0].aval.shape)
+          deepEqual(eqn.params.shape, eqn.inputs[0].aval.shape)) ||
+        (eqn.primitive === Primitive.Transpose &&
+          (eqn.params.perm as number[]).every((p, i) => p === i)) ||
+        (eqn.primitive === Primitive.Flip && eqn.params.axis.length === 0) ||
+        (eqn.primitive === Primitive.Shrink &&
+          (eqn.params.slice as Pair[]).every(
+            ([s, e], i) => s === 0 && e === eqn.inputs[0].aval.shape[i],
+          )) ||
+        (eqn.primitive === Primitive.Pad &&
+          (eqn.params.width as Pair[]).every(
+            ([w0, w1]) => w0 === 0 && w1 === 0,
+          ))
       ) {
-        // No-op broadcast or reshape, just pass through the input.
+        // No-op movement operation, just pass through the input.
         context.set(eqn.outBinders[0], eqn.inputs[0]);
       } else {
         newEqns.push(eqn);
