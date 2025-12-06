@@ -15,12 +15,10 @@ const y = np.dot(X.ref, wTrue.ref).greater(0).astype(np.float32);
 // Define loss function (binary cross-entropy).
 const lossFn = jit((w: np.Array) => {
   const logits = np.dot(X.ref, w);
-  const yPred = nn.sigmoid(logits);
+  const logP = nn.logSigmoid(logits.ref);
+  const logNotP = nn.logSigmoid(np.negative(logits));
   const loss = np
-    .add(
-      y.ref.mul(np.log(yPred.ref)),
-      np.subtract(1, y.ref).mul(np.log(np.subtract(1, yPred))),
-    )
+    .add(y.ref.mul(logP), np.subtract(1, y.ref).mul(logNotP))
     .mean()
     .neg();
   return loss;
