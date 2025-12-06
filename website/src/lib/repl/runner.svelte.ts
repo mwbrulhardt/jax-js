@@ -48,9 +48,17 @@ export class ReplRunner {
     if (this.running) return;
     this.running = true;
     this.finished = false;
+    const startTime = Date.now();
     try {
       await _runProgram(source, device, this);
     } finally {
+      const endTime = Date.now();
+      if (endTime - startTime < 100) {
+        // Take at least 100ms, otherwise it's unclear it actually ran.
+        await new Promise((resolve) =>
+          setTimeout(resolve, 100 - (endTime - startTime)),
+        );
+      }
       this.running = false;
       this.finished = true;
     }
@@ -196,7 +204,7 @@ async function _runProgram(source: string, device: Device, runner: ReplRunner) {
   if (devices.includes(device)) {
     jax.defaultDevice(device);
   } else {
-    mockConsole.warn(`${device} not supported, falling back to Wasm`);
+    mockConsole.warn(`${device} not supported, using wasm`);
     jax.defaultDevice("wasm");
   }
 

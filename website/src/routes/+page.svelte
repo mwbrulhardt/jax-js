@@ -25,9 +25,9 @@
 
 <!-- Header -->
 <header
-  class="px-6 py-4 flex items-center justify-between max-w-screen-xl mx-auto font-tiktok"
+  class="px-6 py-4 flex items-center justify-between max-w-screen-xl mx-auto font-tiktok gap-6"
 >
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-3 shrink-0">
     <a href={resolve("/")}>
       <img src={logo} alt="jax-js logo" class="h-8" />
     </a>
@@ -38,12 +38,14 @@
       target="_blank"
       class="hover:text-primary">GitHub</a
     >
-    <a href={resolve("/repl")} class="hover:text-primary">REPL</a>
+    <a href={resolve("/repl")} class="hidden sm:block hover:text-primary"
+      >REPL</a
+    >
     <a
       rel="external"
       target="_blank"
       href="https://www.ekzhang.com/jax-js/docs/"
-      class="hover:text-primary transition-colors">API Reference</a
+      class="hover:text-primary transition-colors">Reference</a
     >
   </nav>
 </header>
@@ -51,10 +53,11 @@
 <main class="font-tiktok">
   <!-- Hero section -->
   <section class="px-6 py-12 md:py-16 max-w-screen-xl mx-auto">
-    <div class="grid md:grid-cols-[5fr_3fr] gap-12 items-center">
+    <div class="grid md:grid-cols-[5fr_3fr] gap-x-12 gap-y-16 items-center">
       <div>
         <h1 class="text-3xl sm:text-4xl mb-6 leading-tight max-w-2xl">
-          jax-js is a machine learning library and compiler for the web
+          jax-js is <span class="hidden sm:inline">a machine learning</span
+          ><span class="sm:hidden">an ML</span> library and compiler for the web
         </h1>
         <p class="text-lg text-gray-700 leading-snug mb-8 max-w-2xl">
           High-performance WebGPU and WebAssembly kernels in JavaScript. Run AI
@@ -107,10 +110,10 @@
 
   <!-- Explainer section -->
   <section class="mx-auto max-w-screen-xl my-8 sm:px-6">
-    <div class="sm:rounded-xl bg-primary/5 px-6 py-8">
+    <div class="sm:rounded-xl bg-primary/5 px-8 py-8">
       <div class="mx-auto max-w-2xl">
         <h2 class="text-xl font-medium text-center mb-6">
-          Like JAX and PyTorch, but running in your browser
+          Like JAX and PyTorch in your browser
         </h2>
 
         <p class="mb-6">

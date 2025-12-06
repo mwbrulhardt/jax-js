@@ -57,6 +57,7 @@
       fontSize: 13,
       automaticLayout: true,
       renderLineHighlight: "none",
+      minimap: { enabled: false },
       ...editorOptions,
     });
     if (onchange) {
@@ -103,3 +104,12 @@
 </script>
 
 <div class="h-full" bind:this={containerEl}></div>
+
+<style lang="postcss">
+  @reference "$app.css";
+
+  /* Cannot be disabled in config, see https://github.com/microsoft/vscode/issues/239240 */
+  div :global(.iPadShowKeyboard) {
+    display: none;
+  }
+</style>

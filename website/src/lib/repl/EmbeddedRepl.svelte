@@ -47,7 +47,7 @@
     class="shrink-0 border-b border-gray-200 flex items-center px-2 py-1.5 gap-2"
   >
     <button
-      class="bg-green-100 hover:bg-green-200 px-2 py-0.5 rounded flex text-sm items-center gap-1.5"
+      class="bg-green-100 hover:bg-green-200 disabled:opacity-50 px-2 py-0.5 rounded flex text-sm items-center gap-1.5"
       onclick={handleRun}
       disabled={runner.running}
     >
@@ -68,7 +68,7 @@
     </button>
     <a
       href={replLink}
-      class="hover:bg-gray-100 px-2 py-0.5 rounded flex text-sm items-center gap-1.5 text-gray-600"
+      class="hidden sm:flex hover:bg-gray-100 px-2 py-0.5 rounded text-sm items-center gap-1.5 text-gray-600"
     >
       <ExternalLinkIcon size={16} />
       Open REPL
@@ -90,6 +90,7 @@
       min="40px"
       max="-40px"
       --color="var(--color-gray-200)"
+      --thickness="16px"
     >
       {#snippet a()}
         <div class="!overflow-visible">
@@ -102,7 +103,6 @@
                 top: 8,
                 bottom: 8,
               },
-              minimap: { enabled: false },
               scrollbar: { alwaysConsumeMouseWheel: false, useShadows: false },
               scrollBeyondLastLine: false,
             }}
@@ -154,5 +154,6 @@
   .split-pane-container :global(svelte-split-pane-section) {
     overflow: visible !important;
     min-height: 0;
+    min-width: 0;
   }
 </style>

@@ -140,6 +140,7 @@
     min="200px"
     max="40%"
     --color="var(--color-gray-200)"
+    --thickness="16px"
   >
     {#snippet a()}
       <div
@@ -190,6 +191,7 @@
         min="10%"
         max="-64px"
         --color="var(--color-gray-200)"
+        --thickness="16px"
       >
         {#snippet a()}
           <div class="flex flex-col min-w-0 !overflow-visible">
@@ -274,5 +276,6 @@
   div :global(svelte-split-pane-section) {
     overflow: visible !important;
     min-height: 0;
+    min-width: 0;
   }
 </style>
