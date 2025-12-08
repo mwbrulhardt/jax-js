@@ -15,6 +15,6 @@
   <!-- Needs to be an absolute URL, so this is hardcoded. -->
   <meta
     property="og:image"
-    content="https://www.ekzhang.com/jax-js/images/social-image.png"
+    content="https://jax-js.com/images/social-image.png"
   />
 </svelte:head>

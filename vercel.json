@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "sveltekit-1",
+  "buildCommand": "( cd website && pnpm check && pnpm lint && pnpm build ) && pnpm run docs && cp -r docs/ website/build/docs",
+  "outputDirectory": "website/build",
+  "installCommand": "pnpm install --frozen-lockfile && pnpm build",
+  "devCommand": "pnpm -C website dev",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        }
+      ]
+    }
+  ]
+}

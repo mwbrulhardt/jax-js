@@ -1,6 +1,6 @@
 # jax-js: JAX in pure JavaScript
 
-[Website](https://www.ekzhang.com/jax-js/) | [API Reference](https://www.ekzhang.com/jax-js/docs/)
+[Website](https://jax-js.com) | [API Reference](https://jax-js.com/docs/)
 
 **jax-js** is a machine learning framework for the browser. It aims to bring JAX-style,
 high-performance CPU and GPU kernels to JavaScript, so you can run numerical applications on the
@@ -77,7 +77,7 @@ script tag. This is the easiest way to get started on a blank HTML page.
 We haven't spent a ton of time optimizing yet, but performance is generally pretty good. `jit` is
 very helpful for fusing operations together, and it's a feature only available on the web in jax-js.
 The default kernel-tuning heuristics get about 3000 GFLOP/s for matrix multiplication on an M4 Pro
-chip ([try it](https://www.ekzhang.com/jax-js/bench/matmul)).
+chip ([try it](https://jax-js.com/bench/matmul)).
 
 For that example, it's around the same GFLOP/s as
 [TensorFlow.js](https://github.com/tensorflow/tfjs) and
@@ -88,11 +88,11 @@ libraries of custom kernels (versus jax-js, which generates kernels with an ML c
 
 If you make something cool with jax-js, don't be a stranger! We can feature it here.
 
-- [In-browser REPL](https://www.ekzhang.com/jax-js/repl)
-- [Interactive MNIST training](https://www.ekzhang.com/jax-js/mnist)
-- [Matmul benchmark](https://www.ekzhang.com/jax-js/bench/matmul)
-- [Conv2d benchmark](https://www.ekzhang.com/jax-js/bench/conv2d)
-- [Mandelbrot set](https://www.ekzhang.com/jax-js/mandelbrot)
+- [In-browser REPL](https://jax-js.com/repl)
+- [Interactive MNIST training](https://jax-js.com/mnist)
+- [Matmul benchmark](https://jax-js.com/bench/matmul)
+- [Conv2d benchmark](https://jax-js.com/bench/conv2d)
+- [Mandelbrot set](https://jax-js.com/mandelbrot)
 
 ## Development
 

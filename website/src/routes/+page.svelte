@@ -46,7 +46,7 @@
     <a
       rel="external"
       target="_blank"
-      href="https://www.ekzhang.com/jax-js/docs/"
+      href="https://jax-js.com/docs/"
       class="hover:text-primary transition-colors">Reference</a
     >
   </nav>

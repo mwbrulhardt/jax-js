@@ -24,7 +24,7 @@ In the tables below, we use a color legend to refer to functions in JAX:
 
 ## [`jax`](https://docs.jax.dev/en/latest/jax.html)
 
-[API docs](https://www.ekzhang.com/jax-js/docs/modules/_jax-js_jax.html) for these functions.
+[API docs](https://jax-js.com/docs/modules/_jax-js_jax.html) for these functions.
 
 | API                  | Support | Notes                                           |
 | -------------------- | ------- | ----------------------------------------------- |
@@ -105,7 +105,7 @@ supported.
 | `np.float64`  | 🟠          | 🟠   | 🔴     | no webgpu support  |
 
 Most operations behave the same way as they do in JAX.
-[API docs](https://www.ekzhang.com/jax-js/docs/modules/_jax-js_jax.numpy.html).
+[API docs](https://jax-js.com/docs/modules/_jax-js_jax.numpy.html).
 
 | API                   | Support | Notes                                   |
 | --------------------- | ------- | --------------------------------------- |
@@ -693,8 +693,8 @@ and optimization library at `@jax-js/optax`. You can install this alongside `@ja
 npm i @jax-js/optax
 ```
 
-[API docs](https://www.ekzhang.com/jax-js/docs/modules/_jax-js_optax.html). Currently, the following
-optimizers are supported:
+[API docs](https://jax-js.com/docs/modules/_jax-js_optax.html). Currently, the following optimizers
+are supported:
 
 - SGD
 - Adam
