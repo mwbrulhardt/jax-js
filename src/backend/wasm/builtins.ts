@@ -2,6 +2,20 @@
 
 import { CodeGenerator } from "./wasmblr";
 
+/** Given a local `x`, evaluate `sum[i](a_i * x^i)` and push to stack. */
+function _poly(cg: CodeGenerator, x: number, as: number[]): void {
+  if (as.length === 0) throw new Error("_poly needs at least one coefficient");
+  cg.f32.const(as[as.length - 1]);
+  for (let i = as.length - 2; i >= 0; i--) {
+    cg.local.get(x);
+    cg.f32.mul();
+    if (as[i] !== 0) {
+      cg.f32.const(as[i]);
+      cg.f32.add();
+    }
+  }
+}
+
 /**
  * Approximate e^x.
  *
@@ -56,28 +70,7 @@ export function wasm_exp(cg: CodeGenerator): number {
     cg.local.set(r);
 
     // P(r) ≈ 1 + r + r^2/2 + r^3/6 + r^4/24 + r^5/120
-    // Horner form: 1 + r*(1 + r*(1/2 + r*(1/6 + r*(1/24 + r/120))))
-    cg.f32.const(1 / 120);
-    cg.local.get(r);
-    cg.f32.mul();
-    cg.f32.const(1 / 24);
-    cg.f32.add();
-    cg.local.get(r);
-    cg.f32.mul();
-    cg.f32.const(1 / 6);
-    cg.f32.add();
-    cg.local.get(r);
-    cg.f32.mul();
-    cg.f32.const(1 / 2);
-    cg.f32.add();
-    cg.local.get(r);
-    cg.f32.mul();
-    cg.f32.const(1.0);
-    cg.f32.add();
-    cg.local.get(r);
-    cg.f32.mul();
-    cg.f32.const(1.0);
-    cg.f32.add();
+    _poly(cg, r, [1, 1, 1 / 2, 1 / 6, 1 / 24, 1 / 120]);
     cg.local.set(p);
 
     // scale = 2^k via exponent bits: ((k + 127) << 23)
@@ -110,11 +103,6 @@ export function wasm_log(cg: CodeGenerator): number {
     const m = cg.local.declare(cg.f32);
     const t = cg.local.declare(cg.f32);
     const t2 = cg.local.declare(cg.f32);
-    const t3 = cg.local.declare(cg.f32);
-    const t5 = cg.local.declare(cg.f32);
-    const t7 = cg.local.declare(cg.f32);
-    const lnm = cg.local.declare(cg.f32);
-    const el2 = cg.local.declare(cg.f32);
 
     // Handle (very) small or non-positive quickly: if x <= 0 -> NaN
     cg.local.get(0);
@@ -165,47 +153,19 @@ export function wasm_log(cg: CodeGenerator): number {
     cg.local.get(t);
     cg.f32.mul();
     cg.local.set(t2); // t^2
-    cg.local.get(t);
-    cg.local.get(t2);
-    cg.f32.mul();
-    cg.local.set(t3); // t^3
-    cg.local.get(t3);
-    cg.local.get(t2);
-    cg.f32.mul();
-    cg.local.set(t5); // t^5
-    cg.local.get(t5);
-    cg.local.get(t2);
-    cg.f32.mul();
-    cg.local.set(t7); // t^7
 
     // lnm ≈ 2 * ( t + t^3/3 + t^5/5 + t^7/7 )
-    cg.local.get(t7);
-    cg.f32.const(1 / 7);
-    cg.f32.mul();
-    cg.local.get(t5);
-    cg.f32.const(1 / 5);
-    cg.f32.mul();
-    cg.f32.add();
-    cg.local.get(t3);
-    cg.f32.const(1 / 3);
-    cg.f32.mul();
-    cg.f32.add();
+    _poly(cg, t2, [2, 2 / 3, 2 / 5, 2 / 7]);
     cg.local.get(t);
-    cg.f32.add();
-    cg.f32.const(2.0);
     cg.f32.mul();
-    cg.local.set(lnm);
 
     // el2 = e * ln2
     cg.local.get(e);
     cg.f32.convert_i32_s();
     cg.f32.const(Math.LN2);
     cg.f32.mul();
-    cg.local.set(el2);
 
     // ln(x) ≈ e*ln2 + ln(m)
-    cg.local.get(el2);
-    cg.local.get(lnm);
     cg.f32.add();
   });
 }
@@ -259,37 +219,13 @@ function _sincos(cg: CodeGenerator): { q: number; sz: number; cz: number } {
   cg.local.set(z2);
 
   // sin poly: z * (1 + z^2 * (-1/6 + z^2 * (1/120 + z^2 * (-1/5040))))
-  cg.f32.const(-1 / 5040);
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(1 / 120);
-  cg.f32.add();
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(-1 / 6);
-  cg.f32.add();
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(1.0);
-  cg.f32.add();
+  _poly(cg, z2, [1, -1 / 6, 1 / 120, -1 / 5040]);
   cg.local.get(z);
   cg.f32.mul();
   cg.local.set(sz);
 
   // cos poly: 1 + z^2 * (-1/2 + z^2 * (1/24 + z^2 * (-1/720)))
-  cg.f32.const(-1 / 720);
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(1 / 24);
-  cg.f32.add();
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(-1 / 2);
-  cg.f32.add();
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(1.0);
-  cg.f32.add();
+  _poly(cg, z2, [1, -1 / 2, 1 / 24, -1 / 720]);
   cg.local.set(cz);
 
   return { q, sz, cz };
@@ -391,26 +327,10 @@ function _atan(cg: CodeGenerator) {
   //   B1 = 0.994987933645, B2 = 0.173698870181
 
   // Compute P(z^2) = A0 + z^2*(A1 + z^2*A2)
-  cg.f32.const(0.0415796528637);
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(0.661705427875);
-  cg.f32.add();
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(0.999998614341);
-  cg.f32.add();
+  _poly(cg, z2, [0.999998614341, 0.661705427875, 0.0415796528637]);
 
   // Compute Q(z^2) = 1.0 + z^2*(B1 + z^2*B2)
-  cg.f32.const(0.173698870181);
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(0.994987933645);
-  cg.f32.add();
-  cg.local.get(z2);
-  cg.f32.mul();
-  cg.f32.const(1.0);
-  cg.f32.add();
+  _poly(cg, z2, [1.0, 0.994987933645, 0.173698870181]);
 
   // result = z * (P / Q)
   cg.f32.div();

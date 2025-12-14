@@ -62,9 +62,9 @@
           ><span class="sm:hidden">an ML</span> library and compiler for the web
         </h1>
         <p class="text-lg text-gray-700 leading-snug mb-8 max-w-2xl">
-          High-performance WebGPU and WebAssembly kernels in JavaScript. Run AI
-          training and inference, image algorithms, simulations, and numerical
-          code on arrays, all JIT compiled in your browser.
+          High-performance WebGPU and WebAssembly kernels in JavaScript. Run
+          neural networks, image algorithms, simulations, and numerical code on
+          arrays, all JIT compiled in your browser.
         </p>
 
         <!-- Add to project box -->
