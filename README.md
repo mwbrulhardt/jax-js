@@ -1,10 +1,14 @@
-# jax-js: JAX in pure JavaScript
+<h1 align="center">jax-js: JAX in pure JavaScript</h1>
 
-[Website](https://jax-js.com) | [API Reference](https://jax-js.com/docs/)
+<p align="center"><strong>
+  <a href="https://jax-js.com">Website</a> |
+  <a href="https://jax-js.com/docs/">API Reference</a> |
+  <a href="./FEATURES.md">Compatibility Table</a>
+</strong></p>
 
-**jax-js** is a machine learning framework for the browser. It aims to bring JAX-style,
-high-performance CPU and GPU kernels to JavaScript, so you can run numerical applications on the
-web.
+**jax-js** is a machine learning framework for the browser. It aims to bring
+[JAX](https://jax.dev)-style, high-performance CPU and GPU kernels to JavaScript, so you can run
+numerical applications on the web.
 
 ```bash
 npm i @jax-js/jax
@@ -19,52 +23,18 @@ GPU ML framework, since it runs anywhere a browser can run.
 
 ## Quickstart
 
-You can use `jax-js` as an array API, just like NumPy.
-
 ```js
 import { numpy as np } from "@jax-js/jax";
 
-// Array operations, compatible with NumPy.
+// Array operations, compatible with JAX/NumPy.
 const x = np.array([1, 2, 3]);
 const y = x.mul(4); // [4, 8, 12]
 ```
 
-It also lets you take derivatives with `grad` like in JAX (as well as `vmap`, `jit`).
-
-```js
-import { grad, numpy as np } from "@jax-js/jax";
-
-// Calculate derivatives with reverse-mode AD.
-const norm = (a) => a.ref.mul(a).sum();
-
-const x = np.array([1, 2, 3]);
-const xnorm = norm(x.ref); // 1^2 + 2^2 + 3^2 = 14
-const xgrad = grad(norm)(x); // [2, 4, 6]
-```
-
-The default backend runs on CPU, but on [supported browsers](https://caniuse.com/webgpu) including
-Chrome and iOS Safari, you can switch to GPU for better performance.
-
-```js
-import { defaultDevice, init, numpy as np } from "@jax-js/jax";
-
-// Initialize the GPU backend.
-await init("webgpu");
-
-// Change the default backend to GPU.
-defaultDevice("webgpu");
-
-const x = np.ones([4096, 4096]);
-const y = np.dot(x.ref, x); // JIT-compiled into a matrix multiplication kernel
-```
-
-Most common JAX APIs are supported. See the [compatibility table](./FEATURES.md) for a full
-breakdown of what features are available.
-
 ### Web usage (CDN)
 
-If you want to use `jax-js` in vanilla JavaScript (without a bundler), just import from a module
-script tag. This is the easiest way to get started on a blank HTML page.
+In vanilla JavaScript (without a bundler), just import from a module script tag. This is the easiest
+way to get started on a blank HTML page.
 
 ```html
 <script type="module">
@@ -74,8 +44,8 @@ script tag. This is the easiest way to get started on a blank HTML page.
 
 ## Tutorial
 
-For the most part, programming in `jax-js` looks very similar to JAX, just in JavaScript. We provide
-fine-grained TypeScript type annotations for functions as well.
+Programming in `jax-js` looks [very similar to JAX](https://docs.jax.dev/en/latest/jax-101.html),
+just in JavaScript.
 
 ### Arrays
 
@@ -104,11 +74,11 @@ Once you're done with it, you can unwrap a `jax.Array` back into JavaScript. Thi
 any pending operations or lazy updates:
 
 ```ts
-// 1) Returns as a possibly nested JavaScript array.
+// 1) Returns a possibly nested JavaScript array.
 ar.js();
 await ar.jsAsync(); // Faster, non-blocking
 
-// 2) Returns as a flat TypedArray data buffer.
+// 2) Returns a flat TypedArray data buffer.
 ar.dataSync();
 await ar.data(); // Fastest, non-blocking
 ```
@@ -255,9 +225,9 @@ and determines how to execute compiled operations on them.
 There are currently 3 devices in jax-js:
 
 - `cpu`: Slow, mostly for debugging purposes.
-- `wasm`: [WebAssembly (CPU)](https://webassembly.org/), currently single-threaded and blocking.
-- `webgpu`: [WebGPU (GPU)](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API), highest
-  performance.
+- `wasm`: [WebAssembly](https://webassembly.org/), currently single-threaded and blocking.
+- `webgpu`: [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API), available on
+  [supported browsers](https://caniuse.com/webgpu) (Chrome, Firefox, Safari, iOS).
 
 The default device is `wasm`, but you can change this at startup time:
 
@@ -332,7 +302,7 @@ libraries of custom kernels (versus jax-js, which generates kernels with an ML c
 
 ### API Reference
 
-That's all for this short tutorial. Please see the auto-generated
+That's all for this short tutorial. Please see the generated
 [API reference](https://jax-js.com/docs) for detailed documentation.
 
 ## Examples
