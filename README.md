@@ -181,8 +181,8 @@ fuses operations together into a single kernel dispatch. This
 accelerators, which is the bottleneck on GPU rather than raw FLOPs. For instance:
 
 ```ts
-export const hypot = jit(function hypot(x1: Array, x2: Array) {
-  return sqrt(square(x1).add(square(x2)));
+export const hypot = jit(function hypot(x1: np.Array, x2: np.Array) {
+  return np.sqrt(np.square(x1).add(np.square(x2)));
 });
 ```
 
