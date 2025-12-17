@@ -1,6 +1,7 @@
 <script lang="ts">
   import { LoaderCircle, SquareMousePointerIcon } from "@lucide/svelte";
   import { onMount } from "svelte";
+  import { fade } from "svelte/transition";
 
   interface PerfResults {
     flops: {
@@ -15,11 +16,11 @@
   // Fall back to these if
   const ericLaptopResults: PerfResults = {
     flops: {
-      Wasm: 1.72,
+      Wasm: 2.72,
       WebGPU: 2071,
       "WebGPU-fp16": 3343,
     },
-    browser: "Chrome on macOS arm64",
+    browser: "Chrome on Apple M3 Pro",
     live: false,
   };
 
@@ -94,9 +95,21 @@
     };
   }
 
-  onMount(async () => {
-    // await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay for UX
-    results = await measurePerf();
+  let measuring = $state(false);
+
+  async function measurementTask() {
+    if (measuring) return;
+    measuring = true;
+    try {
+      results = null;
+      results = await measurePerf();
+    } finally {
+      measuring = false;
+    }
+  }
+
+  onMount(() => {
+    measurementTask();
   });
 
   // Bar chart configuration
@@ -199,22 +212,22 @@
           height={barHeight}
           fill={barColors[backend]}
           rx="4"
-          style="transition: height 0.8s ease-out, y 0.8s ease-out;"
+          style="transition: height 0.5s ease-out, y 0.5s ease-out;"
         />
 
         <!-- Value label on top of bar -->
-        <text
-          x={xPos + barWidth / 2}
-          y={yPos - 8}
-          text-anchor="middle"
-          class="text-sm font-semibold"
-          fill="#1e293b"
-          style="transition: y 0.8s ease-out, opacity 0.3s ease-in; opacity: {results
-            ? 1
-            : 0};"
-        >
-          {formatNumber(value)}
-        </text>
+        {#if results}
+          <text
+            x={xPos + barWidth / 2}
+            y={yPos - 8}
+            text-anchor="middle"
+            class="text-sm font-semibold"
+            fill="#1e293b"
+            in:fade={{ delay: 200, duration: 300 }}
+          >
+            {formatNumber(value)}
+          </text>
+        {/if}
 
         <!-- Backend label below bar -->
         <text
@@ -238,10 +251,22 @@
       <LoaderCircle size={16} class="animate-spin text-gray-400" />
       <p class="text-gray-500">Running benchmark…</p>
     {:else}
-      <SquareMousePointerIcon size={16} class="text-gray-500" />
-      <p class="text-gray-800">
-        {results.browser}
-      </p>
+      <button
+        class="flex items-center gap-2"
+        onclick={() => {
+          if (results?.live) {
+            measurementTask();
+          }
+        }}
+        disabled={!results.live || measuring}
+      >
+        {#if results.live}
+          <SquareMousePointerIcon size={16} class="text-gray-500" />
+        {/if}
+        <p class="text-gray-800">
+          {results.browser}
+        </p>
+      </button>
     {/if}
   </div>
 </section>
