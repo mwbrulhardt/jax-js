@@ -82,9 +82,16 @@
     if (!adapter) return ericLaptopResults;
     const hasF16 = adapter.features.has("shader-f16");
 
+    const isApple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
+    const isMobile = /Mobi/.test(navigator.userAgent);
+
     // Large matmuls put pressure on mobile browsers like iOS Safari, and it can
     // lead to page crashes. Also the measured FLOPs is lower.
-    const gpuDim = navigator.userAgent.includes("Mobi") ? 2048 : 4096;
+    //
+    // It also looks like some Windows PCs have trouble with GPU, keeping things
+    // suitably small to really avoid accidentally crashing someone's browser on
+    // page load.
+    const gpuDim = isApple ? (isMobile ? 2048 : 4096) : 768;
 
     return {
       flops: {
