@@ -43,6 +43,13 @@ export class JsTreeDef {
     readonly childTreedefs: JsTreeDef[],
   ) {}
 
+  /** Get the total number of leaves in the tree. */
+  get size(): number {
+    return this.nodeType === NodeType.Leaf
+      ? 1
+      : this.childTreedefs.reduce((a, b) => a + b.size, 0);
+  }
+
   /** Returns a string representation of this tree definition. */
   toString(root = true): string {
     if (root) {

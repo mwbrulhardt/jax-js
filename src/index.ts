@@ -56,7 +56,7 @@ export const vmap = vmapModule.vmap as <
   F extends (...args: any[]) => JsTree<Array>,
 >(
   f: F,
-  inAxes?: number | MapJsTree<Parameters<F>, ArrayLike, number | null>,
+  inAxes?: number | (number | null | JsTree<number | null>)[],
 ) => (...args: MapJsTree<Parameters<F>, Array, ArrayLike>) => ReturnType<F>;
 
 /**

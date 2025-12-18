@@ -46,7 +46,6 @@ import {
 } from "./core";
 import {
   JsTree,
-  JsTreeDef,
   flatten as treeFlatten,
   unflatten as treeUnflatten,
 } from "../tree";
@@ -406,15 +405,32 @@ export function vmap(
 ): (...x: JsTree<TracerValue>[]) => JsTree<Tracer> {
   return (...args: any[]) => {
     const [argsFlat, inTree] = treeFlatten(args);
-    let inAxesFlat: (number | null)[];
+    let inAxesFlat: (number | null)[] = [];
     if (typeof inAxes === "number") {
       // If mapping over a single axis, just use it for all inputs.
       inAxesFlat = rep(argsFlat.length, inAxes);
     } else {
-      let inTree2: JsTreeDef;
-      [inAxesFlat, inTree2] = treeFlatten(inAxes);
-      if (!inTree.equals(inTree2)) {
-        throw new TreeMismatchError("vmap", inTree, inTree2);
+      // Allow either `null | number` (or undefined), or a tree structure
+      // matching each input.
+      for (let i = 0; i < args.length; i++) {
+        if (inAxes[i] == null) {
+          inAxesFlat.push(...rep(inTree.childTreedefs[i].size, null));
+        } else if (typeof inAxes[i] === "number") {
+          inAxesFlat.push(
+            ...rep(inTree.childTreedefs[i].size, inAxes[i] as number),
+          );
+        } else {
+          // Must be a tree structure.
+          const [axesFlat, axesTreeDef] = treeFlatten(inAxes[i]);
+          if (!inTree.childTreedefs[i].equals(axesTreeDef)) {
+            throw new TreeMismatchError(
+              "vmap",
+              inTree.childTreedefs[i],
+              axesTreeDef,
+            );
+          }
+          inAxesFlat.push(...axesFlat);
+        }
       }
     }
     const [fFlat, outTree] = flattenFun(f, inTree);

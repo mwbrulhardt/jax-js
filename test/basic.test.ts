@@ -183,6 +183,24 @@ suite("jax.vmap()", () => {
     expect(b.js()).toEqual([2, 5]);
     expect(c.js()).toEqual([3, 6]);
   });
+
+  test("can use axis number for entire pytree inputs", () => {
+    type AB = { a: np.Array; b: np.Array };
+    const f = (x: AB, y: AB) => x.a.add(x.b).add(y.a).add(y.b);
+    const batchedF = vmap(f, [null, 0]);
+    const x: AB = {
+      a: np.array([1, 2]),
+      b: np.array([3, 4]),
+    };
+    const y: AB = {
+      a: np.array([10, 20, 30, 40]).reshape([2, 2]),
+      b: np.array([100, 200, 300, 400]).reshape([2, 2]),
+    };
+    expect(batchedF(x, y).js()).toEqual([
+      [114, 226],
+      [334, 446],
+    ]);
+  });
 });
 
 suite("jax.jacfwd()", () => {
