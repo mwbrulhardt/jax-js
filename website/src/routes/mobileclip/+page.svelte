@@ -359,6 +359,14 @@
                 <BookMarkedIcon size={20} />
                 <span><em>The Picture of Dorian Gray</em> by Oscar Wilde</span>
               </button>
+              <button
+                class="btn"
+                onclick={() => setupBook("fitzgerald-great-gatsby")}
+                disabled={isDownloadingWeights || isDownloadingData}
+              >
+                <BookMarkedIcon size={20} />
+                <span><em>The Great Gatsby</em> by F. Scott Fitzgerald</span>
+              </button>
             </div>
           </div>
 

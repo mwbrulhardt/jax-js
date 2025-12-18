@@ -26,6 +26,8 @@ export async function downloadBook(id: string): Promise<Book> {
       return await dickensGreatExpectations();
     case "wilde-dorian-gray":
       return await wildeDorianGray();
+    case "fitzgerald-great-gatsby":
+      return await fitzgeraldGreatGatsby();
     default:
       throw new Error(`Unknown book ID: ${id}`);
   }
@@ -42,8 +44,9 @@ function splitExcerpts(text: string): string[] {
   const excerpts: string[] = [];
 
   for (const para of paragraphs) {
-    if (para.length < MIN_LENGTH) {
-      continue; // Skip short paragraphs
+    // Skip short paragraphs or horizontal rules
+    if (para.length < MIN_LENGTH || /^-+$/.test(para)) {
+      continue;
     }
 
     if (para.length <= MAX_LENGTH) {
@@ -148,6 +151,42 @@ async function wildeDorianGray(): Promise<Book> {
   return {
     title: "The Picture of Dorian Gray",
     author: "Oscar Wilde",
+    chapters,
+  };
+}
+
+async function fitzgeraldGreatGatsby(): Promise<Book> {
+  // https://www.gutenberg.org/ebooks/64317
+  const url =
+    "https://huggingface.co/datasets/ekzhang/jax-js-examples/raw/main/pg64317.txt";
+
+  const dataBytes = await cachedFetch(url);
+  const content = new TextDecoder().decode(dataBytes).replace(/\r/g, "");
+
+  // Split by chapter headings (I, II, III, etc. centered with spaces)
+  const chapterRegex = /\n +([IVXLC]+)\s*\n/g;
+  const chapters: Chapter[] = [];
+
+  const matches = [...content.matchAll(chapterRegex)];
+
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i];
+    const startIndex = match.index! + match[0].length;
+    const endIndex =
+      i < matches.length - 1 ? matches[i + 1].index! : content.length;
+
+    const chapterText = content.slice(startIndex, endIndex).trim();
+    const excerpts = splitExcerpts(chapterText);
+
+    chapters.push({
+      title: `Chapter ${match[1]}`,
+      excerpts,
+    });
+  }
+
+  return {
+    title: "The Great Gatsby",
+    author: "F. Scott Fitzgerald",
     chapters,
   };
 }
