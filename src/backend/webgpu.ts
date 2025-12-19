@@ -361,6 +361,7 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
   // Some expressions may be used twice, so we keep track of them.
   let gensymCount = 0;
   const gensym = () => `alu${gensymCount++}`;
+  const isGensym = (text: string) => text.match(/^alu[0-9]+$/);
 
   // Insert phony assignments for inputs that are not in use.
   // https://github.com/gpuweb/gpuweb/discussions/4582#discussioncomment-9146686
@@ -405,10 +406,13 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
         // Edge case: WebGPU doesn't handle NaN correctly, it's unspecified.
         // This is a reliable way I found to detect NaNs, since the spec says
         // for `max()`: if one operand is a NaN, the other is returned.
-        const dty = dtypeToWgsl(src[0].dtype);
-        source = isFloatDtype(src[0].dtype)
-          ? `(${a} != ${b} || min(${strip1(a)}, ${dty}(inf())) != ${a})`
-          : `(${a} != ${b})`;
+        if (isFloatDtype(src[0].dtype)) {
+          const x = isGensym(a) ? a : gensym();
+          if (x !== a) emit(`let ${x} = ${a};`);
+          source = `(${x} != ${b} || min(${x}, ${dtypeToWgsl(src[0].dtype)}(inf())) != ${x})`;
+        } else {
+          source = `(${a} != ${b})`;
+        }
       }
     } else if (AluGroup.Unary.has(op)) {
       if (op === AluOp.Reciprocal && src[0].op === AluOp.Sqrt) {
