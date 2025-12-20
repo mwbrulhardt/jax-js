@@ -76,6 +76,9 @@ importers:
 
   website:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: ^2.10.2
+        version: 2.10.2
       '@fontsource-variable/tiktok-sans':
         specifier: ^5.2.3
         version: 5.2.3
@@ -130,9 +133,9 @@ importers:
       monaco-editor:
         specifier: ^0.55.1
         version: 0.55.1
-      onnx-proto:
-        specifier: ^8.0.1
-        version: 8.0.1
+      onnx-buf:
+        specifier: ^1.20.0-0
+        version: 1.20.0-0
       onnxruntime-web:
         specifier: ^1.23.2
         version: 1.23.2
@@ -253,6 +256,9 @@ packages:
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
+
+  '@bufbuild/protobuf@2.10.2':
+    resolution: {integrity: sha512-uFsRXwIGyu+r6AMdz+XijIIZJYpoWeYzILt5yZ2d3mCjQrWUTVpVD9WL/jZAbvp+Ed04rOhrsk7FiTcEDseB5A==}
 
   '@bundled-es-modules/cookie@2.0.1':
     resolution: {integrity: sha512-8o+5fRPLNbjbdGRRmJj3h6Hh1AQJf2dk3qQ/5ZFb+PXkRNiSoMGGUKlsgLfrxneb72axVJyIYji64E2+nNfYyw==}
@@ -2408,8 +2414,9 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  onnx-proto@8.0.1:
-    resolution: {integrity: sha512-ZpPTqp5dneh2bvavk/QpDsf20JJRArjqTkiMfshGmxR8ocjmfTk80fkW00FwLO7qRtybo9NPugcWQrumHYctLQ==}
+  onnx-buf@1.20.0-0:
+    resolution: {integrity: sha512-h6BWfsBanlws+AYlHdX+hrTQAhI+sHwbjHVr8T3PXwgaCY9d/PSm+F0ckMzCPWqDHneC6a6L4t8nP/hLYDl3Jg==}
+    engines: {pnpm: '>=10.0.0'}
 
   onnxruntime-common@1.23.2:
     resolution: {integrity: sha512-5LFsC9Dukzp2WV6kNHYLNzp8sT6V02IubLCbzw2Xd6X5GOlr65gAX6xiJwyi2URJol/s71gaQLC5F2C25AAR2w==}
@@ -2542,10 +2549,6 @@ packages:
   prettier@3.6.2:
     resolution: {integrity: sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==}
     engines: {node: '>=14'}
-    hasBin: true
-
-  protobufjs@6.11.4:
-    resolution: {integrity: sha512-5kQWPaJHi1WoCpjTGszzQ32PG2F4+wRY6BmAT4Vfw56Q2FZ4YZzK20xUYQH4YkfehY1e6QSICrJquM6xXZNcrw==}
     hasBin: true
 
   protobufjs@7.5.4:
@@ -3248,6 +3251,8 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@bcoe/v8-coverage@1.0.2': {}
+
+  '@bufbuild/protobuf@2.10.2': {}
 
   '@bundled-es-modules/cookie@2.0.1':
     dependencies:
@@ -5455,9 +5460,9 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
 
-  onnx-proto@8.0.1:
+  onnx-buf@1.20.0-0:
     dependencies:
-      protobufjs: 6.11.4
+      '@bufbuild/protobuf': 2.10.2
 
   onnxruntime-common@1.23.2: {}
 
@@ -5571,22 +5576,6 @@ snapshots:
       svelte: 5.36.13
 
   prettier@3.6.2: {}
-
-  protobufjs@6.11.4:
-    dependencies:
-      '@protobufjs/aspromise': 1.1.2
-      '@protobufjs/base64': 1.1.2
-      '@protobufjs/codegen': 2.0.4
-      '@protobufjs/eventemitter': 1.1.0
-      '@protobufjs/fetch': 1.1.0
-      '@protobufjs/float': 1.0.2
-      '@protobufjs/inquire': 1.1.0
-      '@protobufjs/path': 1.1.2
-      '@protobufjs/pool': 1.1.0
-      '@protobufjs/utf8': 1.1.0
-      '@types/long': 4.0.2
-      '@types/node': 24.1.0
-      long: 4.0.0
 
   protobufjs@7.5.4:
     dependencies:

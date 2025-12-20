@@ -690,62 +690,83 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
     // Helper function to create a simple ONNX model with just a MatMul operation
     async createMatMulModel(dim: number): Promise<Uint8Array> {
-      const { onnx } = await import("onnx-proto");
+      const { create, toBinary } = await import("@bufbuild/protobuf");
+      const {
+        GraphProtoSchema,
+        ModelProtoSchema,
+        NodeProtoSchema,
+        OperatorSetIdProtoSchema,
+        TensorProto_DataType,
+        TensorShapeProto_DimensionSchema,
+        TensorShapeProtoSchema,
+        TypeProto_TensorSchema,
+        TypeProtoSchema,
+        ValueInfoProtoSchema,
+      } = await import("onnx-buf");
 
       const elemType = {
-        fp32: onnx.TensorProto.DataType.FLOAT,
-        fp16: onnx.TensorProto.DataType.FLOAT16,
+        fp32: TensorProto_DataType.FLOAT,
+        fp16: TensorProto_DataType.FLOAT16,
       }[this.dtype];
 
+      const dimension = (value: number | bigint) => {
+        return create(TensorShapeProto_DimensionSchema, {
+          value: {
+            case: "dimValue",
+            value: BigInt(value),
+          },
+        });
+      };
+
       // Create input tensors
-      const input1 = onnx.ValueInfoProto.create({
+      const input1 = create(ValueInfoProtoSchema, {
         name: "A",
-        type: onnx.TypeProto.create({
-          tensorType: onnx.TypeProto.Tensor.create({
-            elemType,
-            shape: onnx.TensorShapeProto.create({
-              dim: [
-                onnx.TensorShapeProto.Dimension.create({ dimValue: dim }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: dim }),
-              ],
+        type: create(TypeProtoSchema, {
+          value: {
+            case: "tensorType",
+            value: create(TypeProto_TensorSchema, {
+              elemType,
+              shape: create(TensorShapeProtoSchema, {
+                dim: [dimension(dim), dimension(dim)],
+              }),
             }),
-          }),
+          },
         }),
       });
 
-      const input2 = onnx.ValueInfoProto.create({
+      const input2 = create(ValueInfoProtoSchema, {
         name: "B",
-        type: onnx.TypeProto.create({
-          tensorType: onnx.TypeProto.Tensor.create({
-            elemType,
-            shape: onnx.TensorShapeProto.create({
-              dim: [
-                onnx.TensorShapeProto.Dimension.create({ dimValue: dim }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: dim }),
-              ],
+        type: create(TypeProtoSchema, {
+          value: {
+            case: "tensorType",
+            value: create(TypeProto_TensorSchema, {
+              elemType,
+              shape: create(TensorShapeProtoSchema, {
+                dim: [dimension(dim), dimension(dim)],
+              }),
             }),
-          }),
+          },
         }),
       });
 
       // Create output tensor
-      const output = onnx.ValueInfoProto.create({
+      const output = create(ValueInfoProtoSchema, {
         name: "C",
-        type: onnx.TypeProto.create({
-          tensorType: onnx.TypeProto.Tensor.create({
-            elemType,
-            shape: onnx.TensorShapeProto.create({
-              dim: [
-                onnx.TensorShapeProto.Dimension.create({ dimValue: dim }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: dim }),
-              ],
+        type: create(TypeProtoSchema, {
+          value: {
+            case: "tensorType",
+            value: create(TypeProto_TensorSchema, {
+              elemType,
+              shape: create(TensorShapeProtoSchema, {
+                dim: [dimension(dim), dimension(dim)],
+              }),
             }),
-          }),
+          },
         }),
       });
 
       // Create MatMul node
-      const matmulNode = onnx.NodeProto.create({
+      const matmulNode = create(NodeProtoSchema, {
         input: ["A", "B"],
         output: ["C"],
         opType: "MatMul",
@@ -753,7 +774,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
       });
 
       // Create the graph
-      const graph = onnx.GraphProto.create({
+      const graph = create(GraphProtoSchema, {
         node: [matmulNode],
         name: "matmul_graph",
         input: [input1, input2],
@@ -761,14 +782,14 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
       });
 
       // Create the model
-      const model = onnx.ModelProto.create({
-        irVersion: 8,
-        opsetImport: [onnx.OperatorSetIdProto.create({ version: 14 })],
+      const model = create(ModelProtoSchema, {
+        irVersion: 8n,
+        opsetImport: [create(OperatorSetIdProtoSchema, { version: 14n })],
         graph: graph,
       });
 
       // Serialize to bytes
-      return onnx.ModelProto.encode(model).finish();
+      return toBinary(ModelProtoSchema, model);
     }
 
     async run(): Promise<number> {

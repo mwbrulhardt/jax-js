@@ -37,6 +37,7 @@
     "vite-plugin-lucide-preprocess": "^1.4.6"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.10.2",
     "@fontsource-variable/tiktok-sans": "^5.2.3",
     "@jax-js/jax": "workspace:^",
     "@jax-js/loaders": "workspace:^",
@@ -55,7 +56,7 @@
     "js-base64": "^3.7.8",
     "merge-descriptors": "^2.0.0",
     "monaco-editor": "^0.55.1",
-    "onnx-proto": "^8.0.1",
+    "onnx-buf": "^1.20.0-0",
     "onnxruntime-web": "^1.23.2",
     "p-throttle": "^7.0.0",
     "svelte": "^5.20.2"

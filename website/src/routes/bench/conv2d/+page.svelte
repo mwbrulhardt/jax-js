@@ -253,103 +253,123 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
     // Helper function to create a simple ONNX model with a Conv operation
     async createConvModel(): Promise<Uint8Array> {
-      const { onnx } = await import("onnx-proto");
+      const { create, toBinary } = await import("@bufbuild/protobuf");
+      const {
+        AttributeProto_AttributeType,
+        AttributeProtoSchema,
+        GraphProtoSchema,
+        ModelProtoSchema,
+        NodeProtoSchema,
+        OperatorSetIdProtoSchema,
+        TensorProto_DataType,
+        TensorShapeProto_DimensionSchema,
+        TensorShapeProtoSchema,
+        TypeProto_TensorSchema,
+        TypeProtoSchema,
+        ValueInfoProtoSchema,
+      } = await import("onnx-buf");
 
       const elemType = {
-        fp32: onnx.TensorProto.DataType.FLOAT,
-        fp16: onnx.TensorProto.DataType.FLOAT16,
+        fp32: TensorProto_DataType.FLOAT,
+        fp16: TensorProto_DataType.FLOAT16,
       }[this.dtype];
 
+      const dimension = (value: number | bigint) => {
+        return create(TensorShapeProto_DimensionSchema, {
+          value: {
+            case: "dimValue",
+            value: BigInt(value),
+          },
+        });
+      };
+
       // Create input tensor (NCHW format)
-      const input = onnx.ValueInfoProto.create({
+      const input = create(ValueInfoProtoSchema, {
         name: "input",
-        type: onnx.TypeProto.create({
-          tensorType: onnx.TypeProto.Tensor.create({
-            elemType,
-            shape: onnx.TensorShapeProto.create({
-              dim: [
-                onnx.TensorShapeProto.Dimension.create({
-                  dimValue: batchSize,
-                }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: channels }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: height }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: width }),
-              ],
+        type: create(TypeProtoSchema, {
+          value: {
+            case: "tensorType",
+            value: create(TypeProto_TensorSchema, {
+              elemType,
+              shape: create(TensorShapeProtoSchema, {
+                dim: [
+                  dimension(batchSize),
+                  dimension(channels),
+                  dimension(height),
+                  dimension(width),
+                ],
+              }),
             }),
-          }),
+          },
         }),
       });
 
       // Create filter tensor (OIHW format)
-      const filter = onnx.ValueInfoProto.create({
+      const filter = create(ValueInfoProtoSchema, {
         name: "filter",
-        type: onnx.TypeProto.create({
-          tensorType: onnx.TypeProto.Tensor.create({
-            elemType,
-            shape: onnx.TensorShapeProto.create({
-              dim: [
-                onnx.TensorShapeProto.Dimension.create({
-                  dimValue: outChannels,
-                }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: channels }),
-                onnx.TensorShapeProto.Dimension.create({
-                  dimValue: filterHeight,
-                }),
-                onnx.TensorShapeProto.Dimension.create({
-                  dimValue: filterWidth,
-                }),
-              ],
+        type: create(TypeProtoSchema, {
+          value: {
+            case: "tensorType",
+            value: create(TypeProto_TensorSchema, {
+              elemType,
+              shape: create(TensorShapeProtoSchema, {
+                dim: [
+                  dimension(outChannels),
+                  dimension(channels),
+                  dimension(filterHeight),
+                  dimension(filterWidth),
+                ],
+              }),
             }),
-          }),
+          },
         }),
       });
 
       // Create output tensor
-      const output = onnx.ValueInfoProto.create({
+      const output = create(ValueInfoProtoSchema, {
         name: "output",
-        type: onnx.TypeProto.create({
-          tensorType: onnx.TypeProto.Tensor.create({
-            elemType,
-            shape: onnx.TensorShapeProto.create({
-              dim: [
-                onnx.TensorShapeProto.Dimension.create({
-                  dimValue: batchSize,
-                }),
-                onnx.TensorShapeProto.Dimension.create({
-                  dimValue: outChannels,
-                }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: height }),
-                onnx.TensorShapeProto.Dimension.create({ dimValue: width }),
-              ],
+        type: create(TypeProtoSchema, {
+          value: {
+            case: "tensorType",
+            value: create(TypeProto_TensorSchema, {
+              elemType,
+              shape: create(TensorShapeProtoSchema, {
+                dim: [
+                  dimension(batchSize),
+                  dimension(outChannels),
+                  dimension(height),
+                  dimension(width),
+                ],
+              }),
             }),
-          }),
+          },
         }),
       });
 
       // Create Conv node with appropriate attributes
-      const convNode = onnx.NodeProto.create({
+      const convNode = create(NodeProtoSchema, {
         input: ["input", "filter"],
         output: ["output"],
         opType: "Conv",
         name: "conv_node",
         attribute: [
           // Set padding to "same" mode
-          onnx.AttributeProto.create({
+          create(AttributeProtoSchema, {
             name: "pads",
-            type: onnx.AttributeProto.AttributeType.INTS,
-            ints: [1, 1, 1, 1], // [top, left, bottom, right]
+            type: AttributeProto_AttributeType.INTS,
+            ints: [1n, 1n, 1n, 1n], // [top, left, bottom, right]
           }),
           // Set strides
-          onnx.AttributeProto.create({
+          create(AttributeProtoSchema, {
             name: "strides",
-            type: onnx.AttributeProto.AttributeType.INTS,
-            ints: [1, 1],
+            type: AttributeProto_AttributeType.INTS,
+            ints: [1n, 1n],
           }),
         ],
       });
 
       // Create the graph
-      const graph = onnx.GraphProto.create({
+      const graph = create(GraphProtoSchema, {
         node: [convNode],
         name: "conv_graph",
         input: [input, filter],
@@ -357,14 +377,14 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
       });
 
       // Create the model
-      const model = onnx.ModelProto.create({
-        irVersion: 8,
-        opsetImport: [onnx.OperatorSetIdProto.create({ version: 14 })],
+      const model = create(ModelProtoSchema, {
+        irVersion: 8n,
+        opsetImport: [create(OperatorSetIdProtoSchema, { version: 14n })],
         graph: graph,
       });
 
       // Serialize to bytes
-      return onnx.ModelProto.encode(model).finish();
+      return toBinary(ModelProtoSchema, model);
     }
 
     async run(): Promise<number> {
