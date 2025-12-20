@@ -71,6 +71,7 @@
 
   let consoleLines = $derived(replRunner.consoleLines);
   let mockConsole = replRunner.mockConsole;
+  let runDurationMs = $derived(replRunner.runDurationMs);
 
   afterNavigate(({ type }) => {
     if (type === "enter") return; // Already handled on load
@@ -252,6 +253,10 @@
                 />
               {:else if consoleLines.length === 0}
                 <span>(empty)</span>
+              {:else if runDurationMs !== null}
+                <span class="ml-1 text-gray-400"
+                  >({Math.round(runDurationMs)} ms)</span
+                >
               {/if}
             </p>
             <div
