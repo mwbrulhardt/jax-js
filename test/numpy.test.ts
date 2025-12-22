@@ -142,6 +142,12 @@ suite.each(devices)("device:%s", (device) => {
         [0, 0, 10],
       ]);
     });
+
+    test("computes trace", () => {
+      const x = np.arange(9).reshape([3, 3]);
+      expect(np.trace(x.ref).js()).toEqual(12);
+      expect(np.trace(x, 1).js()).toEqual(6);
+    });
   });
 
   suite("jax.numpy.tri()", () => {

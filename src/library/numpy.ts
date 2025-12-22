@@ -649,6 +649,11 @@ export function diag(v: ArrayLike, k = 0): Array {
   }
 }
 
+/** Calculate the sum of the diagonal of an array along the given axes. */
+export function trace(a: ArrayLike, offset = 0, axis1 = 0, axis2 = 1): Array {
+  return diagonal(a, offset, axis1, axis2).sum(-1);
+}
+
 /** Return if two arrays are element-wise equal within a tolerance. */
 export function allclose(
   actual: Parameters<typeof array>[0],

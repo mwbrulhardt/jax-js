@@ -431,7 +431,7 @@ Most operations behave the same way as they do in JAX.
 | `tanh`                | 🟢      |                                         |
 | `tensordot`           | 🟢      |                                         |
 | `tile`                | 🟢      |                                         |
-| `trace`               | 🟠      |                                         |
+| `trace`               | 🟢      |                                         |
 | `trapezoid`           | 🟠      |                                         |
 | `transpose`           | 🟢      |                                         |
 | `tri`                 | 🟢      |                                         |
