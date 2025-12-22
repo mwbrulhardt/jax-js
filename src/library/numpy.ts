@@ -746,6 +746,14 @@ export function tensordot(
     // There is no reduction to perform, just do an outer product.
     return x.reshape([...x.shape, ...rep(y.ndim, 1)]).mul(y);
   }
+  const axisShapeX = axisX.map((a) => x.shape[a]);
+  const axisShapeY = axisY.map((a) => y.shape[a]);
+  if (!deepEqual(axisShapeX, axisShapeY)) {
+    throw new Error(
+      `tensordot: shapes not aligned along axes ${JSON.stringify(axes)}:` +
+        ` ${JSON.stringify(axisShapeX)} != ${JSON.stringify(axisShapeY)}`,
+    );
+  }
   // Move the axes to the end of X and the end of Y.
   const freeX = range(x.ndim).filter((a) => !axisX.includes(a));
   const freeY = range(y.ndim).filter((a) => !axisY.includes(a));
