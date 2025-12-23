@@ -1386,7 +1386,7 @@ export const power = jit(function power(x1: Array, x2: Array) {
   // If x2 is odd integer, result sign matches x1, else it's positive.
   const resultSign = where(
     core.mod(x2i, 2).notEqual(0) as Array,
-    sign(x1.ref),
+    where(x1.ref.less(0), -1, 1),
     1,
   );
   return where(shouldBeNaN, nan, exp(log(abs(x1)).mul(x2)).mul(resultSign));

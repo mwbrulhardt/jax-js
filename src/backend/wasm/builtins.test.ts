@@ -34,6 +34,11 @@ test("wasm_exp has relative error < 2e-7", async () => {
   for (const x of testValues) {
     expect(relativeError(exp(x), Math.exp(x))).toBeLessThan(2e-7);
   }
+
+  // Test edge cases
+  expect(exp(Infinity)).toBe(Infinity);
+  expect(exp(-Infinity)).toBe(0);
+  expect(exp(NaN)).toBeNaN();
 });
 
 test("wasm_log has relative error < 5e-7", async () => {
@@ -51,9 +56,11 @@ test("wasm_log has relative error < 5e-7", async () => {
     expect(relativeError(log(x), Math.log(x))).toBeLessThan(5e-7);
   }
 
-  // Test edge case: log(x <= 0) should return NaN
-  expect(log(0)).toBeNaN();
+  // Test edge cases: log(x < 0) should return NaN
   expect(log(-1)).toBeNaN();
+  expect(log(0)).toBe(-Infinity);
+  expect(log(Infinity)).toBe(Infinity);
+  expect(log(NaN)).toBeNaN();
 });
 
 test("wasm_sin has absolute error < 5e-7", async () => {
@@ -89,6 +96,10 @@ test("wasm_sin has absolute error < 5e-7", async () => {
   for (const x of testValues) {
     expect(Math.abs(sin(x) - Math.sin(x))).toBeLessThan(5e-7);
   }
+
+  expect(sin(Infinity)).toBeNaN();
+  expect(sin(-Infinity)).toBeNaN();
+  expect(sin(NaN)).toBeNaN();
 });
 
 test("wasm_cos has absolute error < 5e-7", async () => {
@@ -124,6 +135,10 @@ test("wasm_cos has absolute error < 5e-7", async () => {
   for (const x of testValues) {
     expect(Math.abs(cos(x) - Math.cos(x))).toBeLessThan(5e-7);
   }
+
+  expect(cos(Infinity)).toBeNaN();
+  expect(cos(-Infinity)).toBeNaN();
+  expect(cos(NaN)).toBeNaN();
 });
 
 test("wasm_atan has relative error < 2e-6", async () => {
@@ -145,6 +160,10 @@ test("wasm_atan has relative error < 2e-6", async () => {
   for (const x of testValues) {
     expect(relativeError(atan(x), Math.atan(x))).toBeLessThan(2e-6);
   }
+
+  expect(atan(Infinity)).toBeCloseTo(Math.PI / 2);
+  expect(atan(-Infinity)).toBeCloseTo(-Math.PI / 2);
+  expect(atan(NaN)).toBeNaN();
 });
 
 test("wasm_erf has relative error < 2e-6", async () => {
@@ -162,6 +181,10 @@ test("wasm_erf has relative error < 2e-6", async () => {
   for (const x of testValues) {
     expect(relativeError(wasmErf(x), erf(x))).toBeLessThan(2e-6);
   }
+
+  expect(wasmErf(Infinity)).toBe(1);
+  expect(wasmErf(-Infinity)).toBe(-1);
+  expect(wasmErf(NaN)).toBeNaN();
 });
 
 test("wasm_erfc has relative error < 2e-7", async () => {
@@ -179,6 +202,10 @@ test("wasm_erfc has relative error < 2e-7", async () => {
   for (const x of testValues) {
     expect(relativeError(wasmErfc(x), erfc(x))).toBeLessThan(2e-7);
   }
+
+  expect(wasmErfc(Infinity)).toBe(0);
+  expect(wasmErfc(-Infinity)).toBe(2);
+  expect(wasmErfc(NaN)).toBeNaN();
 });
 
 test("wasm_threefry2x32 produces expected results", async () => {

@@ -104,10 +104,10 @@ export function wasm_log(cg: CodeGenerator): number {
     const t = cg.local.declare(cg.f32);
     const t2 = cg.local.declare(cg.f32);
 
-    // Handle (very) small or non-positive quickly: if x <= 0 -> NaN
+    // Handle negative quickly: if x <= 0 -> NaN
     cg.local.get(0);
     cg.f32.const(0.0);
-    cg.f32.le();
+    cg.f32.lt();
     cg.if(cg.void);
     {
       cg.f32.const(NaN);
@@ -128,6 +128,28 @@ export function wasm_log(cg: CodeGenerator): number {
     cg.i32.const(127);
     cg.i32.sub();
     cg.local.set(e);
+
+    // If subnormal or zero, return -Infinity
+    cg.local.get(e);
+    cg.i32.const(-127);
+    cg.i32.eq();
+    cg.if(cg.void);
+    {
+      cg.f32.const(-Infinity);
+      cg.return();
+    }
+    cg.end();
+
+    // If Infinity or NaN, return x
+    cg.local.get(e);
+    cg.i32.const(128);
+    cg.i32.eq();
+    cg.if(cg.void);
+    {
+      cg.local.get(0);
+      cg.return();
+    }
+    cg.end();
 
     // m_bits = (bits & 0x7fffff) | 0x3f800000  => m in [1,2)
     cg.local.get(bits);
@@ -205,7 +227,7 @@ function _sincos(cg: CodeGenerator): { q: number; sz: number; cz: number } {
   cg.f32.mul();
   cg.f32.nearest();
   cg.local.tee(qf);
-  cg.i32.trunc_f32_s();
+  cg.i32.trunc_sat_f32_s();
   cg.local.set(q);
 
   cg.local.get(y);

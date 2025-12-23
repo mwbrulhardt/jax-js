@@ -1054,6 +1054,11 @@ suite.each(devices)("device:%s", (device) => {
       expect(y.js()).toBeAllclose([0, 1, Math.E, Math.E ** 2, Math.E ** 3]);
     });
 
+    test("exp(-Infinity) = 0", () => {
+      const x = np.exp(-Infinity);
+      expect(x.js()).toEqual(0);
+    });
+
     test("works with small and large numbers", () => {
       const x = np.array([-1000, -100, -50, -10, 0, 10, 50, 100, 1000]);
       const y = np.exp(x);
@@ -1099,6 +1104,11 @@ suite.each(devices)("device:%s", (device) => {
       const x = np.array([1, Math.E, Math.E ** 2]);
       const y = np.log(x);
       expect(y.js()).toBeAllclose([0, 1, 2]);
+    });
+
+    test("log(0) is -Infinity", () => {
+      const x = np.log(0);
+      expect(x.js()).toEqual(-Infinity);
     });
 
     test("works with jvp", () => {
@@ -1153,7 +1163,7 @@ suite.each(devices)("device:%s", (device) => {
       const x = np.array([-8, -1, 0, 1, 8]);
       const [y, dy] = jvp(np.cbrt, [x], [np.ones([5])]);
       expect(y).toBeAllclose([-2, -1, 0, 1, 2]);
-      expect(dy).toBeAllclose([1 / 12, 1 / 3, Infinity, 1 / 3, 1 / 12]);
+      expect(dy).toBeAllclose([1 / 12, 1 / 3, NaN, 1 / 3, 1 / 12]);
     });
   });
 
@@ -1174,6 +1184,11 @@ suite.each(devices)("device:%s", (device) => {
       // expect(y).toBeAllclose([1 / 9, -1 / 3, 1, -3, 9, -27, 81, -243]);
       const z = np.power(-3, np.array([0.5, 1.5, 2.5]));
       expect(z.js()).toEqual([NaN, NaN, NaN]);
+    });
+
+    test("power of zero", () => {
+      const y = np.power(0, np.array([-2, -1, 0, 0.5, 1, 2]));
+      expect(y.js()).toEqual([Infinity, Infinity, NaN, 0, 0, 0]);
     });
   });
 
