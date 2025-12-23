@@ -8,6 +8,7 @@ import {
   jit,
   lax,
   numpy as np,
+  vmap,
 } from "@jax-js/jax";
 import { beforeEach, expect, suite, test } from "vitest";
 
@@ -268,5 +269,91 @@ suite.each(devices)("device:%s", (device) => {
     // dy[1] = sum of x[1] windows = [2+3+4+5, 3+4+5+6] = [14, 18]
     // dy[2] = sum of x[2] windows = [3+4+5+6, 4+5+6+7] = [18, 22]
     expect(dy.js()).toEqual([[[10, 14]], [[14, 18]], [[18, 22]]]);
+  });
+
+  test("vmapped 1d convolution", () => {
+    // vmap over a batch of inputs with a single kernel
+    // lhs shape: [N, C_in, W], rhs shape: [C_out, C_in, kW]
+    const conv1d = (x: np.Array, y: np.Array) =>
+      lax.convGeneralDilated(x, y, [1], "VALID");
+
+    // 3 different inputs to vmap over, each with shape [1, 1, 5]
+    const x = np.array([
+      [[[1, 2, 3, 4, 5]]], // input 0: [N=1, C=1, W=5]
+      [[[2, 3, 4, 5, 6]]], // input 1
+      [[[3, 4, 5, 6, 7]]], // input 2
+    ]); // shape [3, 1, 1, 5]
+
+    const y = np.array([[[2, 0.5, -1]]]); // shape [1, 1, 3] = [C_out=1, C_in=1, kW=3]
+
+    // vmap over x (axis 0), keep y unbatched (null)
+    const vmappedConv = vmap(conv1d, [0, null]);
+    const result = vmappedConv(x, y);
+
+    // Each input is convolved with the same kernel
+    // [1,2,3,4,5] conv [2,0.5,-1] = [2+1-3, 4+1.5-4, 6+2-5] = [0, 1.5, 3]
+    // [2,3,4,5,6] conv [2,0.5,-1] = [4+1.5-4, 6+2-5, 8+2.5-6] = [1.5, 3, 4.5]
+    // [3,4,5,6,7] conv [2,0.5,-1] = [6+2-5, 8+2.5-6, 10+3-7] = [3, 4.5, 6]
+    expect(result.shape).toEqual([3, 1, 1, 3]);
+    expect(result.js()).toEqual([
+      [[[0, 1.5, 3]]],
+      [[[1.5, 3, 4.5]]],
+      [[[3, 4.5, 6]]],
+    ]);
+  });
+
+  test("vmapped 2d convolution over inputs and kernels", () => {
+    // vmap over both inputs and kernels
+    const conv2d = (x: np.Array, y: np.Array) =>
+      lax.convGeneralDilated(x, y, [1, 1], "VALID");
+
+    // 2 different inputs, each with shape [N=1, C_in=1, H=2, W=3]
+    const x = np.array([
+      [
+        [
+          [
+            [1, 2, 3],
+            [4, 5, 6],
+          ],
+        ],
+      ], // input 0
+      [
+        [
+          [
+            [2, 3, 4],
+            [5, 6, 7],
+          ],
+        ],
+      ], // input 1
+    ]); // shape [2, 1, 1, 2, 3]
+
+    // 2 different kernels, each with shape [C_out=1, C_in=1, kH=2, kW=2]
+    const y = np.array([
+      [
+        [
+          [
+            [1, 0],
+            [0, 1],
+          ],
+        ],
+      ], // kernel 0
+      [
+        [
+          [
+            [0, 1],
+            [1, 0],
+          ],
+        ],
+      ], // kernel 1
+    ]); // shape [2, 1, 1, 2, 2]
+
+    // vmap over both x and y (axis 0)
+    const vmappedConv = vmap(conv2d, [0, 0]);
+    const result = vmappedConv(x, y);
+
+    // input 0 conv kernel 0: [[1+5, 2+6]] = [[6, 8]]
+    // input 1 conv kernel 1: [[3+5, 4+6]] = [[8, 10]]
+    expect(result.shape).toEqual([2, 1, 1, 1, 2]);
+    expect(result.js()).toEqual([[[[[6, 8]]]], [[[[8, 10]]]]]);
   });
 });

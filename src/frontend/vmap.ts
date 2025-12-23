@@ -11,6 +11,7 @@ import {
   cast,
   ceil,
   compare,
+  conv,
   cos,
   dot,
   erf,
@@ -273,7 +274,14 @@ const vmapRules: Partial<{ [P in Primitive]: VmapRule<P> }> = {
     const z = dot(x, y);
     return [[z], [z.ndim - 1]]; // The batch axis is now at the end.
   },
-  // TODO: conv, pool, pool_transpose
+  [Primitive.Conv](axisSize, [x, y], [xBdim, yBdim], params) {
+    // Move batch axes to the front, then increment params.vmapDims.
+    x = moveBatchAxis(axisSize, xBdim, 0, x);
+    y = moveBatchAxis(axisSize, yBdim, 0, y);
+    const z = conv(x, y, { ...params, vmapDims: params.vmapDims + 1 });
+    return [[z], [0]];
+  },
+  // TODO: pool, pool_transpose
   [Primitive.Compare](axisSize, args, dims, { op }) {
     return broadcastBatcher((x, y) => compare(x, y, op))(
       axisSize,
