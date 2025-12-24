@@ -14,7 +14,13 @@ import {
 } from "onnx-buf";
 
 import * as onnxOps from "./ops";
-import { tensorToArray } from "./tensor";
+import {
+  type Operand,
+  operandRef,
+  operandToJax,
+  StaticArray,
+  tensorToOperand,
+} from "./tensor";
 
 /**
  * Loads an ONNX model (`.onnx` file) and provides a jax-js function that
@@ -52,7 +58,7 @@ export class ONNXModel {
   ) => Record<string, np.Array>;
 
   /** Cache of initializers (data / weights), needed for `run()` calls. */
-  #initializers: Map<string, np.Array>;
+  #initializers: Map<string, Operand>;
 
   /** Load a new model from binary contents of an `.onnx` file. */
   constructor(modelBytes: Uint8Array<ArrayBuffer>) {
@@ -83,7 +89,9 @@ export class ONNXModel {
    */
   dispose(): void {
     if (!this.#initializers) return;
-    for (const arr of this.#initializers.values()) arr.dispose();
+    for (const arr of this.#initializers.values()) {
+      if (!(arr instanceof StaticArray)) arr.dispose();
+    }
     this.#initializers.clear();
   }
 }
@@ -133,33 +141,33 @@ function parseAttributes(node: NodeProto): Record<string, any> {
 }
 
 /** Parse all initializers (constant weights) from an ONNX graph. */
-function parseInitializers(initializers: TensorProto[]): Map<string, np.Array> {
-  const map = new Map<string, np.Array>();
+function parseInitializers(initializers: TensorProto[]): Map<string, Operand> {
+  const map = new Map<string, Operand>();
   for (const tensor of initializers) {
-    map.set(tensor.name, tensorToArray(tensor));
+    map.set(tensor.name, tensorToOperand(tensor));
   }
   return map;
 }
 
 /** Execute a single ONNX node. */
-function executeNode(node: NodeProto, vars: Map<string, np.Array>): np.Array[] {
+function executeNode(node: NodeProto, vars: Map<string, Operand>): Operand[] {
   const opType = node.opType;
   const handler = (onnxOps as Record<string, any>)[opType];
   if (!handler) throw new Error(`Unsupported ONNX operation: ${opType}`);
 
-  const inputs: (np.Array | undefined)[] = [];
+  const inputs: (Operand | undefined)[] = [];
   for (const name of node.input) {
     if (name === "") {
       inputs.push(undefined); // Optional input not provided
       continue;
     }
-    const arr = vars.get(name);
-    if (!arr) {
+    const operand = vars.get(name);
+    if (!operand) {
       throw new Error(
         `Missing input '${name}' for node '${node.name}' (op: ${opType})`,
       );
     }
-    inputs.push(arr.ref);
+    inputs.push(operandRef(operand));
   }
   const attrs = parseAttributes(node);
   return handler(inputs, attrs);
@@ -169,6 +177,9 @@ function executeNode(node: NodeProto, vars: Map<string, np.Array>): np.Array[] {
 export interface ONNXRunOptions {
   /** Print out names, input and output shapes when running each operation. */
   verbose?: boolean;
+
+  /** Return intermediate tensors in addition to graph outputs. */
+  additionalOutputs?: string[];
 
   /**
    * Tensors for which to log debug information during execution. When provided,
@@ -243,7 +254,7 @@ function logDebugStats(name: string, arr: np.Array): void {
 
 function modelAsJaxFunction(
   model: ModelProto,
-  initializers: Map<string, np.Array> = new Map(),
+  initializers: Map<string, Operand> = new Map(),
 ): typeof ONNXModel.prototype.run {
   const graph = model.graph;
   if (!graph) {
@@ -286,9 +297,12 @@ function modelAsJaxFunction(
     const debugStats = new Set(options?.debugStats ?? []);
     const verbose = options?.verbose ?? false;
 
-    const vars = new Map<string, np.Array>();
+    const vars = new Map<string, Operand>();
     try {
-      for (const [name, arr] of initializers) vars.set(name, arr.ref);
+      for (const [name, arr] of initializers) {
+        validateTensorShape(name, arr.shape, valueInfo);
+        vars.set(name, operandRef(arr));
+      }
       for (const name of inputNames) {
         validateTensorShape(name, inputs[name].shape, valueInfo);
         vars.set(name, inputs[name]);
@@ -300,12 +314,16 @@ function modelAsJaxFunction(
         if (verbose) {
           const inputs = node.input.map((n) => {
             if (!n) return "_";
-            const arr = vars.get(n)!;
-            return `${n} ${arr.aval}`;
+            const operand = vars.get(n)!;
+            if (operand instanceof StaticArray)
+              return `${n} StaticArray[${operand.shape}]`;
+            return `${n} ${operand.aval}`;
           });
-          const outputs = results.map(
-            (arr, i) => `${node.output[i]} ${arr.aval}`,
-          );
+          const outputs = results.map((operand, i) => {
+            if (operand instanceof StaticArray)
+              return `${node.output[i]} StaticArray[${operand.shape}]`;
+            return `${node.output[i]} ${operand.aval}`;
+          });
           console.log(
             `${node.opType} ${node.name}\n` +
               `  ${inputs.join(", ")} -> ${outputs.join(", ")}`,
@@ -313,25 +331,35 @@ function modelAsJaxFunction(
         }
 
         for (const [i, name] of node.output.entries()) {
-          if (debugStats.has(name)) {
-            logDebugStats(name, results[i].ref);
-          }
-          validateTensorShape(name, results[i].shape, valueInfo);
-          vars.set(name, results[i]);
+          const result = results[i];
+          if (debugStats.has(name))
+            logDebugStats(name, operandToJax(operandRef(result)));
+          validateTensorShape(name, result.shape, valueInfo);
+          vars.set(name, result);
         }
       }
 
-      const outputs: Record<string, np.Array> = {};
-      for (const name of outputNames) {
-        const arr = vars.get(name);
-        if (!arr) throw new Error(`Missing output '${name}'`);
-        outputs[name] = arr;
+      const returnedOutputs = new Set(outputNames);
+      if (options?.additionalOutputs) {
+        for (const name of options.additionalOutputs) returnedOutputs.add(name);
       }
-      for (const name of outputNames) vars.delete(name); // Prevent disposing outputs
+
+      const outputs: Record<string, np.Array> = {};
+      for (const name of returnedOutputs) {
+        const operand = vars.get(name);
+        if (!operand) throw new Error(`Missing output '${name}'`);
+        // Outputs must be np.Array, convert StaticArray if needed
+        outputs[name] = operandToJax(operand);
+      }
+      for (const name of returnedOutputs) vars.delete(name); // Prevent disposing outputs
       return outputs;
     } finally {
       // Clean up, dispose of all values that weren't returned.
-      for (const ar of vars.values()) ar.dispose();
+      for (const operand of vars.values()) {
+        if (!(operand instanceof StaticArray)) {
+          operand.dispose();
+        }
+      }
     }
   };
 }
