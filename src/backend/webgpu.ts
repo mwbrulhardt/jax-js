@@ -286,7 +286,7 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
 
   if (
     tune.exp.some((exp) => exp.dtype === DType.Float16) ||
-    re?.epilogue.some((exp) => exp.dtype === DType.Float16)
+    tune.epilogue?.some((exp) => exp.dtype === DType.Float16)
   ) {
     if (!device.features.has("shader-f16"))
       throw new Error("WebGPU device does not support shader-f16 feature");
@@ -302,7 +302,7 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
 
   const distinctOps = mapSetUnion(
     tune.exp.distinctOps(),
-    re?.epilogue.distinctOps(),
+    tune.epilogue?.distinctOps(),
   );
   if (distinctOps.has(AluOp.Threefry2x32)) {
     emit(threefrySrc);
@@ -316,6 +316,9 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
 
   const usedArgs: (DType | null)[] = Array.from({ length: nargs }, () => null);
   tune.exp.fold((exp) => {
+    if (exp.op === AluOp.GlobalIndex) usedArgs[exp.arg[0]] = exp.dtype;
+  });
+  tune.epilogue?.fold((exp) => {
     if (exp.op === AluOp.GlobalIndex) usedArgs[exp.arg[0]] = exp.dtype;
   });
 
@@ -555,8 +558,11 @@ function pipelineSource(device: GPUDevice, kernel: Kernel): ShaderInfo {
       outputIdxExps.push(exp.simplify(cache));
       countReferences(outputIdxExps[i]);
       fusionExps.push(
-        re.epilogue
-          .substitute({ acc: AluExp.variable(re.dtype, acc[i]) })
+        tune
+          .epilogue!.substitute({
+            acc: AluExp.variable(re.dtype, acc[i]),
+            upcast: AluExp.i32(i),
+          })
           .simplify(cache),
       );
       countReferences(fusionExps[i]);
