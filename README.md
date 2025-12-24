@@ -327,6 +327,9 @@ Contributions are welcomed! Especially in:
 - Adding support for more JAX functions and operations, see [compatibility table](./FEATURES.md).
 - Improving performance of the WebGPU and Wasm runtimes, generating better kernels, and using SIMD
   and multithreading. (Even single-threaded Wasm could be ~20x faster.)
+- Adding support for `jax.profiling`, in particular the start and end trace functions. We should be
+  able to generate `traceEvents` from backends (especially on GPU, with precise timestamp queries)
+  to help with model performance debugging.
 - Helping the JIT compiler to fuse operations in more cases, like `tanh` branches and adding
   epilogue to reductions.
 - Adding WebGL runtime for older browsers that don't support WebGPU.

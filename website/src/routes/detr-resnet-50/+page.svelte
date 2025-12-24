@@ -11,25 +11,28 @@
 
   import { runBenchmark } from "$lib/benchmark";
   import DownloadManager from "$lib/common/DownloadManager.svelte";
+  import { countMethodCalls } from "$lib/profiling";
   import { COCO_CLASSES, stringToColor } from "./coco";
 
   let canvasEl: HTMLCanvasElement;
   let downloadManager: DownloadManager;
   let onnxModel: ONNXModel;
   let onnxModelRun: any;
+  let ortSession: import("onnxruntime-web/webgpu").InferenceSession | null =
+    null;
 
   let runCount = 0;
 
-  function drawDetections(
-    detections: {
-      label: string;
-      prob: number;
-      cx: number;
-      cy: number;
-      w: number;
-      h: number;
-    }[],
-  ) {
+  interface Detection {
+    label: string;
+    prob: number;
+    cx: number;
+    cy: number;
+    w: number;
+    h: number;
+  }
+
+  function drawDetections(detections: Detection[]) {
     const ctx = canvasEl.getContext("2d")!;
     const imgW = canvasEl.width;
     const imgH = canvasEl.height;
@@ -60,6 +63,16 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillText(text, x1 + 4, y1 - 4);
     }
+  }
+
+  function getImageUrl() {
+    const imageUrls = [
+      "https://upload.wikimedia.org/wikipedia/commons/0/00/Gats_domestics.png",
+      "https://upload.wikimedia.org/wikipedia/commons/d/d9/Desk333.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/3/36/Afrykarium_tunel.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/b/b4/Stanton_Cafe_and_Bar_in_Brisbane%2C_Queensland_09.jpg",
+    ];
+    return imageUrls[runCount++ % imageUrls.length];
   }
 
   async function loadImage(url: string): Promise<{
@@ -113,76 +126,17 @@
     return { pixelValues, pixelMask };
   }
 
-  async function loadAndRun() {
-    const devices = await init("webgpu");
-    if (!devices.includes("webgpu")) {
-      alert("WebGPU is not supported on this device/browser.");
-      return;
-    }
-    defaultDevice("webgpu");
-
-    if (typeof onnxModel === "undefined") {
-      // const modelUrl =
-      // "https://huggingface.co/ekzhang/jax-js-models/resolve/main/detr-resnet-50-fp16.onnx";
-      const modelUrl =
-        "https://huggingface.co/Xenova/detr-resnet-50/resolve/main/onnx/model_fp16.onnx";
-      const modelBytes = await downloadManager.fetch("model weights", modelUrl);
-      onnxModel = new ONNXModel(modelBytes);
-      onnxModelRun = jit(onnxModel.run, { staticArgnums: [1] });
-      console.log("ONNX Model loaded:", onnxModel);
-    }
-
-    const imageUrls = [
-      "https://upload.wikimedia.org/wikipedia/commons/0/00/Gats_domestics.png",
-      "https://upload.wikimedia.org/wikipedia/commons/d/d9/Desk333.JPG",
-      "https://upload.wikimedia.org/wikipedia/commons/3/36/Afrykarium_tunel.jpg",
-      "https://upload.wikimedia.org/wikipedia/commons/b/b4/Stanton_Cafe_and_Bar_in_Brisbane%2C_Queensland_09.jpg",
-    ];
-    const imageUrl = imageUrls[runCount++ % imageUrls.length];
-
-    console.log(`Loading image: ${imageUrl}`);
-    const { pixelValues, pixelMask } = await loadImage(imageUrl);
-    console.log("Image loaded:", pixelValues.shape);
-    console.log(
-      "pixel_values min:",
-      await np.min(pixelValues.ref).jsAsync(),
-      "max:",
-      await np.max(pixelValues.ref).jsAsync(),
-    );
-
-    console.log("Running forward pass...");
-    let probs: number[][] = [];
-    let predBoxes: number[][] = [];
-    const seconds = await runBenchmark("detr-resnet-50", async () => {
-      const outputs = onnxModelRun(
-        {
-          pixel_values: pixelValues,
-          pixel_mask: pixelMask,
-        },
-        // { verbose: true },
-      );
-      await blockUntilReady(outputs);
-      console.log("Outputs:", outputs);
-      console.log("Outputs dtype:", outputs.logits.dtype);
-      console.log("logits shape:", outputs.logits.shape);
-      console.log("pred_boxes shape:", outputs.pred_boxes.shape);
-      console.log("Logits:", await outputs.logits.ref.slice(0).jsAsync());
-
-      probs = await nn.softmax(outputs.logits, -1).slice(0).jsAsync(); // [100, 92]
-      predBoxes = await outputs.pred_boxes.slice(0).jsAsync(); // [100, 4]
-    });
-    console.log(`Forward pass took ${seconds.toFixed(3)} s`);
+  async function processOutput(
+    logitsData: Float32Array<ArrayBuffer>,
+    boxesData: Float32Array<ArrayBuffer>,
+  ) {
+    const logits = np.array(logitsData, { shape: [100, 92] });
+    const boxes = np.array(boxesData, { shape: [100, 4] });
+    const probs = await nn.softmax(logits, -1).jsAsync();
+    const predBoxes = await boxes.jsAsync();
 
     // Find detections (excluding "no object" class at index 91)
-    const detections: {
-      label: string;
-      prob: number;
-      cx: number;
-      cy: number;
-      w: number;
-      h: number;
-    }[] = [];
-    // console.log("Detections:");
+    const detections: Detection[] = [];
     for (let i = 0; i < 100; i++) {
       let bestClass = 0;
       let bestProb = 0;
@@ -203,13 +157,134 @@
           w,
           h,
         });
-        // console.log(
-        //   `  ${COCO_CLASSES[bestClass]}: ${(bestProb * 100).toFixed(1)}% at [cx=${cx.toFixed(2)}, cy=${cy.toFixed(2)}, w=${w.toFixed(2)}, h=${h.toFixed(2)}]`,
-        // );
       }
     }
 
-    // Draw detections on the canvas
+    return detections;
+  }
+
+  async function loadAndRun() {
+    const devices = await init("webgpu");
+    if (!devices.includes("webgpu")) {
+      alert("WebGPU is not supported on this device/browser.");
+      return;
+    }
+    defaultDevice("webgpu");
+
+    if (typeof onnxModel === "undefined") {
+      // const modelUrl =
+      // "https://huggingface.co/ekzhang/jax-js-models/resolve/main/detr-resnet-50-fp16.onnx";
+      const modelUrl =
+        "https://huggingface.co/Xenova/detr-resnet-50/resolve/main/onnx/model.onnx";
+      const modelBytes = await downloadManager.fetch("model weights", modelUrl);
+      onnxModel = new ONNXModel(modelBytes);
+      onnxModelRun = jit(onnxModel.run, { staticArgnums: [1] });
+      console.log("ONNX Model loaded:", onnxModel);
+    }
+
+    const imageUrl = getImageUrl();
+    console.log(`Loading image: ${imageUrl}`);
+    const { pixelValues, pixelMask } = await loadImage(imageUrl);
+    console.log("Image loaded:", pixelValues.shape);
+
+    console.log("Running forward pass...");
+
+    const dispatchCount = countMethodCalls(
+      GPUComputePassEncoder,
+      "dispatchWorkgroups",
+    );
+    const bufferCreateCount = countMethodCalls(GPUDevice, "createBuffer");
+
+    let logitsData: Float32Array<ArrayBuffer>;
+    let boxesData: Float32Array<ArrayBuffer>;
+
+    const seconds = await runBenchmark("detr-resnet-50", async () => {
+      const outputs = onnxModelRun(
+        {
+          pixel_values: pixelValues,
+          pixel_mask: pixelMask,
+        },
+        // { verbose: true },
+      );
+      await blockUntilReady(outputs);
+      console.log(
+        "Outputs:",
+        `logits=${outputs.logits.aval}, pred_boxe=${outputs.pred_boxes.aval}`,
+      );
+
+      logitsData = await outputs.logits.slice(0).jsAsync(); // [100, 92]
+      boxesData = await outputs.pred_boxes.slice(0).jsAsync(); // [100, 4]
+    });
+
+    console.log(`Forward pass took ${seconds.toFixed(3)} s`);
+    console.log(
+      `jax-js dispatch count: ${dispatchCount()}, buffer creates: ${bufferCreateCount()}`,
+    );
+
+    const detections = await processOutput(logitsData!, boxesData!);
+    drawDetections(detections);
+  }
+
+  async function loadAndRunOrt() {
+    const ort = await import("onnxruntime-web/webgpu");
+
+    if (!ortSession) {
+      const modelUrl =
+        "https://huggingface.co/Xenova/detr-resnet-50/resolve/main/onnx/model.onnx";
+      const modelBytes = await downloadManager.fetch(
+        "model weights (ort)",
+        modelUrl,
+      );
+      ortSession = await ort.InferenceSession.create(modelBytes, {
+        executionProviders: ["webgpu"],
+      });
+      console.log("ORT Session loaded:", ortSession);
+    }
+
+    const imageUrl = getImageUrl();
+    console.log(`Loading image: ${imageUrl}`);
+    const imageData = await loadImage(imageUrl);
+    const pixelValues = (await imageData.pixelValues.data()) as Float32Array;
+    const pixelMask = new BigInt64Array(
+      [...(await imageData.pixelMask.data())].map(BigInt),
+    );
+    console.log("Image loaded for ORT");
+
+    console.log("Running forward pass with ORT...");
+
+    let logitsData: Float32Array<ArrayBuffer>;
+    let boxesData: Float32Array<ArrayBuffer>;
+
+    const dispatchCount = countMethodCalls(
+      GPUComputePassEncoder,
+      "dispatchWorkgroups",
+    );
+    const bufferCreateCount = countMethodCalls(GPUDevice, "createBuffer");
+
+    const seconds = await runBenchmark("detr-resnet-50-ort", async () => {
+      const tensorPixelValues = new ort.Tensor(
+        "float32",
+        pixelValues,
+        [1, 3, 800, 800],
+      );
+      const tensorPixelMask = new ort.Tensor("int64", pixelMask, [1, 64, 64]);
+
+      const outputs = await ortSession!.run({
+        pixel_values: tensorPixelValues,
+        pixel_mask: tensorPixelMask,
+      });
+      console.log("ORT Outputs:", outputs);
+
+      // Get logits and pred_boxes from outputs
+      logitsData = outputs.logits.data as Float32Array<ArrayBuffer>; // [1, 100, 92]
+      boxesData = outputs.pred_boxes.data as Float32Array<ArrayBuffer>; // [1, 100, 4]
+    });
+    console.log(`ORT Forward pass took ${seconds.toFixed(3)} s`);
+    console.log(
+      `ORT dispatch count: ${dispatchCount()}, buffer creates: ${bufferCreateCount()}`,
+    );
+
+    const detections = await processOutput(logitsData!, boxesData!);
     drawDetections(detections);
   }
 </script>
@@ -217,9 +292,14 @@
 <DownloadManager bind:this={downloadManager} />
 
 <main class="p-4">
-  <button onclick={loadAndRun} class="border px-2">
-    Load & Run DETR ResNet-50
-  </button>
+  <div class="flex gap-2">
+    <button onclick={loadAndRun} class="border px-2">
+      Load & Run (jax-js)
+    </button>
+    <button onclick={loadAndRunOrt} class="border px-2">
+      Load & Run (onnxruntime-web)
+    </button>
+  </div>
   <div class="mt-4">
     <canvas bind:this={canvasEl} class="border" width="800" height="800"
     ></canvas>
