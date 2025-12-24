@@ -847,17 +847,15 @@ function splitGraphDataflow(backend: Backend, jaxpr: Jaxpr): Set<Var> {
     }
     const reach = new Set<Var>();
     let needsCleanOutput = false;
-    for (let j = i + 1; j < jaxpr.eqns.length; j++) {
-      for (const v of jaxpr.eqns[j].inputs) {
-        if (v instanceof Var && eqn.outBinders.includes(v)) {
-          if (needsCleanShapePrimitives.includes(jaxpr.eqns[j].primitive)) {
-            needsCleanOutput = true;
-          }
-          for (const o of jaxpr.eqns[j].outBinders) {
-            const u = p1NextBlack.get(o);
-            if (u) reach.add(u);
-          }
-          break;
+    outer: for (const v of eqn.outBinders) {
+      for (const j of varToUsages.get(v) ?? []) {
+        if (needsCleanShapePrimitives.includes(jaxpr.eqns[j].primitive)) {
+          needsCleanOutput = true;
+          break outer;
+        }
+        for (const o of jaxpr.eqns[j].outBinders) {
+          const u = p1NextBlack.get(o);
+          if (u) reach.add(u);
         }
       }
     }
