@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
-
   import {
     blockUntilReady,
     defaultDevice,
@@ -14,18 +12,15 @@
 
   import { runBenchmark } from "$lib/benchmark";
   import DownloadManager from "$lib/common/DownloadManager.svelte";
-  import { countMethodCalls } from "$lib/profiling";
+  import { countMethodCalls, isMobile } from "$lib/profiling";
   import { COCO_CLASSES, stringToColor } from "./coco";
 
   const width = 800;
   const height = 800;
-  const downsampleFactor = 2;
+  const downsampleFactor = isMobile() ? 2 : 1;
 
   let canvasEl: HTMLCanvasElement;
   let videoEl: HTMLVideoElement;
-  const offscreenCanvas: OffscreenCanvas = browser
-    ? new OffscreenCanvas(width, height)
-    : (null as any);
 
   let downloadManager: DownloadManager;
   let onnxModel: ONNXModel;
@@ -39,6 +34,8 @@
   let isFrontCamera = $state(false);
   let isLooping = $state(false);
 
+  let detections: Detection[] = [];
+
   interface Detection {
     label: string;
     prob: number;
@@ -48,11 +45,8 @@
     h: number;
   }
 
-  function drawDetections(imageData: ImageData, detections: Detection[]) {
-    canvasEl.width = imageData.width;
-    canvasEl.height = imageData.height;
+  function drawDetections(detections: Detection[]) {
     const ctx = canvasEl.getContext("2d")!;
-    ctx.putImageData(imageData, 0, 0);
 
     const imgW = canvasEl.width;
     const imgH = canvasEl.height;
@@ -132,9 +126,10 @@
   async function loadImage(source: "example" | "webcam"): Promise<{
     pixelValues: np.Array;
     pixelMask: np.Array;
-    imageData: ImageData;
   }> {
-    const ctx = offscreenCanvas.getContext("2d", { willReadFrequently: true })!;
+    canvasEl.width = width;
+    canvasEl.height = height;
+    const ctx = canvasEl.getContext("2d", { willReadFrequently: true })!;
 
     if (source === "webcam") {
       // Draw current video frame, center cropped to square
@@ -193,6 +188,7 @@
     }
 
     const imageData = ctx.getImageData(0, 0, width, height);
+    drawDetections(detections);
     const pixels = imageData.data; // RGBA
 
     // ImageNet normalization constants
@@ -225,7 +221,7 @@
     const pixelMask = np.ones([1, 64, 64], { dtype: np.int32 });
 
     await blockUntilReady(pixelValues);
-    return { pixelValues, pixelMask, imageData };
+    return { pixelValues, pixelMask };
   }
 
   async function processOutput(
@@ -249,7 +245,7 @@
         }
       }
       // Filter by confidence threshold
-      if (bestProb > 0.5) {
+      if (bestProb > 0.75) {
         const [cx, cy, w, h] = predBoxes[i];
         detections.push({
           label: COCO_CLASSES[bestClass],
@@ -285,7 +281,7 @@
     }
 
     console.log(`Loading image from: ${inputSource}`);
-    const { pixelValues, pixelMask, imageData } = await loadImage(inputSource);
+    const { pixelValues, pixelMask } = await loadImage(inputSource);
     console.log("Image loaded:", pixelValues.shape);
 
     console.log("Running forward pass...");
@@ -322,8 +318,8 @@
       `jax-js dispatch count: ${dispatchCount()}, buffer creates: ${bufferCreateCount()}`,
     );
 
-    const detections = await processOutput(logitsData!, boxesData!);
-    drawDetections(imageData, detections);
+    detections = await processOutput(logitsData!, boxesData!);
+    drawDetections(detections);
 
     if (isLooping) {
       requestAnimationFrame(() => loadAndRun());
@@ -369,8 +365,8 @@
       const tensorPixelValues = new ort.Tensor("float32", pixelValues, [
         1,
         3,
-        width,
-        height,
+        width / downsampleFactor,
+        height / downsampleFactor,
       ]);
       const tensorPixelMask = new ort.Tensor("int64", pixelMask, [1, 64, 64]);
 
@@ -389,8 +385,8 @@
       `ORT dispatch count: ${dispatchCount()}, buffer creates: ${bufferCreateCount()}`,
     );
 
-    const detections = await processOutput(logitsData!, boxesData!);
-    drawDetections(loadedImage.imageData, detections);
+    detections = await processOutput(logitsData!, boxesData!);
+    drawDetections(detections);
 
     if (isLooping) {
       requestAnimationFrame(() => loadAndRunOrt());
@@ -426,6 +422,7 @@
         <button
           onclick={() => {
             if (inputSource === "webcam") isLooping = true;
+            else detections = [];
             loadAndRun();
           }}
         >
@@ -434,6 +431,7 @@
         <button
           onclick={() => {
             if (inputSource === "webcam") isLooping = true;
+            else detections = [];
             loadAndRunOrt();
           }}
         >
