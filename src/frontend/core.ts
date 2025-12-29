@@ -1044,10 +1044,6 @@ export class ShapedArray implements AbstractValue {
     return new ShapedArray(aval.shape, aval.dtype, aval.weakType);
   }
 
-  static scalarLike(aval: AbstractValue) {
-    return new ShapedArray([], aval.dtype, aval.weakType);
-  }
-
   get ndim() {
     return this.shape.length;
   }
