@@ -14,7 +14,9 @@ import {
   Slot,
   SlotError,
   UnsupportedOpError,
+  UnsupportedRoutineError,
 } from "../backend";
+import { Routine } from "../routine";
 import { tuneNullopt } from "../tuner";
 import { DEBUG, FpHash, mapSetUnion, rep, runWithCache } from "../utils";
 import { WasmAllocator } from "./wasm/allocator";
@@ -109,17 +111,25 @@ export class WasmBackend implements Backend {
     return buffer.slice(start, start + count);
   }
 
-  async prepare(kernel: Kernel): Promise<Executable<WasmProgram>> {
-    return this.prepareSync(kernel);
+  async prepareKernel(kernel: Kernel): Promise<Executable<WasmProgram>> {
+    return this.prepareKernelSync(kernel);
   }
 
-  prepareSync(kernel: Kernel): Executable<WasmProgram> {
+  prepareKernelSync(kernel: Kernel): Executable<WasmProgram> {
     const kernelHash = FpHash.hash(kernel);
     const module = runWithCache(moduleCache, kernelHash.toString(), () => {
       const bytes = codegenWasm(kernel);
       return new WebAssembly.Module(bytes);
     });
     return new Executable(kernel, { module });
+  }
+
+  async prepareRoutine(routine: Routine): Promise<Executable> {
+    return this.prepareRoutineSync(routine);
+  }
+
+  prepareRoutineSync(routine: Routine): Executable {
+    throw new UnsupportedRoutineError(routine.name, this.type);
   }
 
   dispatch(

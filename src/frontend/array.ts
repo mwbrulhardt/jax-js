@@ -13,6 +13,7 @@ import {
   Reduction,
 } from "../alu";
 import { Backend, Device, Executable, getBackend, Slot } from "../backend";
+import { Routine, Routines } from "../routine";
 import { ShapeTracker, unravelAlu } from "../shape";
 import {
   deepEqual,
@@ -70,7 +71,7 @@ export class PendingExecute {
 
   constructor(
     readonly backend: Backend,
-    readonly kernel: Kernel,
+    readonly source: Kernel | Routine,
     readonly inputs: Slot[],
     readonly outputs: Slot[],
   ) {
@@ -99,14 +100,22 @@ export class PendingExecute {
       return;
     }
     this.#promise = (async () => {
-      this.prepared = await this.backend.prepare(this.kernel);
+      if (this.source instanceof Kernel) {
+        this.prepared = await this.backend.prepareKernel(this.source);
+      } else {
+        this.prepared = await this.backend.prepareRoutine(this.source);
+      }
     })();
     await this.#promise;
   }
 
   prepareSync() {
     if (this.prepared) return;
-    this.prepared = this.backend.prepareSync(this.kernel);
+    if (this.source instanceof Kernel) {
+      this.prepared = this.backend.prepareKernelSync(this.source);
+    } else {
+      this.prepared = this.backend.prepareRoutineSync(this.source);
+    }
   }
 
   submit() {
@@ -597,6 +606,39 @@ export class Array extends Tracer {
     });
   }
 
+  /** Apply an operation with custom lowering to this array. */
+  static #routine(
+    routine: Routine,
+    arrays: Array[],
+    outputWeakType: boolean[],
+  ): Array[] {
+    const { backend, committed } = Array.#computeBackend(routine.name, arrays);
+    for (const ar of arrays) ar.#realize();
+
+    const inputs = arrays.map((ar) => ar.#source as Slot);
+    const outputs = routine.type.outputDtypes.map((dtype, i) =>
+      backend.malloc(byteWidth(dtype) * prod(routine.type.outputShapes[i])),
+    );
+    const pending = arrays.flatMap((ar) => ar.#pending);
+    for (const exe of pending) exe.updateRc(+outputs.length);
+    pending.push(new PendingExecute(backend, routine, inputs, outputs));
+    pending[pending.length - 1].updateRc(+outputs.length - 1);
+
+    arrays.forEach((ar) => ar.dispose()); // Dispose of inputs after creating PendingExecute.
+    return outputs.map(
+      (output, i) =>
+        new Array({
+          source: output,
+          st: ShapeTracker.fromShape(routine.type.outputShapes[i]),
+          dtype: routine.type.outputDtypes[i],
+          weakType: outputWeakType[i],
+          backend,
+          committed,
+          pending,
+        }),
+    );
+  }
+
   /**
    * Normalizes this array into one backed by a `Slot`.
    *
@@ -815,6 +857,12 @@ export class Array extends Tracer {
       [Primitive.Mod]([x, y]) {
         return [x.#binary(AluOp.Mod, y)];
       },
+      [Primitive.Min]([x, y]) {
+        return [x.#binary(AluOp.Min, y)];
+      },
+      [Primitive.Max]([x, y]) {
+        return [x.#binary(AluOp.Max, y)];
+      },
       [Primitive.Neg]([x]) {
         return [zerosLike(x.ref).#binary(AluOp.Sub, x)];
       },
@@ -855,24 +903,6 @@ export class Array extends Tracer {
           return [y];
         }
       },
-      [Primitive.RandomBits]([k0, k1], { shape, mode }) {
-        const keyShape = generalBroadcast(k0.shape, k1.shape);
-        if (!deepEqual(generalBroadcast(keyShape, shape), shape)) {
-          throw new TypeError(
-            `Keys of shapes ${k0.shape} and ${k1.shape} cannot be broadcast to shape ${shape}`,
-          );
-        }
-        // Arrays of size >2^32 won't fit into browser memory anyway, so it's
-        // okay to take lazy iota this way for counters.
-        const c0 = zeros(shape, { dtype: DType.Uint32, device: k0.device });
-        const c1 = arange(0, prod(shape), 1, {
-          dtype: DType.Uint32,
-          device: k0.device,
-        }).reshape(shape);
-        const custom = ([k0, k1, c0, c1]: AluExp[]) =>
-          AluExp.threefry2x32(k0, k1, c0, c1, mode);
-        return [Array.#naryCustom("random_bits", custom, [k0, k1, c0, c1])];
-      },
       [Primitive.Sin]([x]) {
         return [x.#unary(AluOp.Sin)];
       },
@@ -899,12 +929,6 @@ export class Array extends Tracer {
       },
       [Primitive.Sqrt]([x]) {
         return [x.#unary(AluOp.Sqrt)];
-      },
-      [Primitive.Min]([x, y]) {
-        return [x.#binary(AluOp.Min, y)];
-      },
-      [Primitive.Max]([x, y]) {
-        return [x.#binary(AluOp.Max, y)];
       },
       [Primitive.Reduce]([x], { op, axis }) {
         if (axis.length === 0) return [x];
@@ -958,6 +982,27 @@ export class Array extends Tracer {
           }),
         ];
       },
+      [Primitive.RandomBits]([k0, k1], { shape, mode }) {
+        const keyShape = generalBroadcast(k0.shape, k1.shape);
+        if (!deepEqual(generalBroadcast(keyShape, shape), shape)) {
+          throw new TypeError(
+            `Keys of shapes ${k0.shape} and ${k1.shape} cannot be broadcast to shape ${shape}`,
+          );
+        }
+        // Arrays of size >2^32 won't fit into browser memory anyway, so it's
+        // okay to take lazy iota this way for counters.
+        const c0 = zeros(shape, { dtype: DType.Uint32, device: k0.device });
+        const c1 = arange(0, prod(shape), 1, {
+          dtype: DType.Uint32,
+          device: k0.device,
+        }).reshape(shape);
+        const custom = ([k0, k1, c0, c1]: AluExp[]) =>
+          AluExp.threefry2x32(k0, k1, c0, c1, mode);
+        return [Array.#naryCustom("random_bits", custom, [k0, k1, c0, c1])];
+      },
+      [Primitive.Gather]([x, ...indices], { axis, outDim }) {
+        return [x.#gather(indices, axis, outDim)];
+      },
       [Primitive.Transpose]([x], { perm }) {
         return [x.#transpose(perm)];
       },
@@ -978,8 +1023,23 @@ export class Array extends Tracer {
       [Primitive.Pad]([x], { width }) {
         return [x.#reshape(x.#st.pad(width))];
       },
-      [Primitive.Gather]([x, ...indices], { axis, outDim }) {
-        return [x.#gather(indices, axis, outDim)];
+      [Primitive.Sort]([x]) {
+        const routine = new Routine(Routines.Sort, {
+          inputShapes: [x.aval.shape],
+          inputDtypes: [x.aval.dtype],
+          outputShapes: [x.aval.shape],
+          outputDtypes: [x.aval.dtype],
+        });
+        return Array.#routine(routine, [x], [x.#weakType]);
+      },
+      [Primitive.Argsort]([x]) {
+        const routine = new Routine(Routines.Argsort, {
+          inputShapes: [x.aval.shape],
+          inputDtypes: [x.aval.dtype],
+          outputShapes: [x.aval.shape],
+          outputDtypes: [DType.Int32],
+        });
+        return Array.#routine(routine, [x], [false]);
       },
       [Primitive.Jit](args, { jaxpr }) {
         if (jaxpr.inBinders.length !== args.length) {

@@ -1,5 +1,19 @@
 import { AluOp, dtypedArray, Kernel } from "../alu";
-import { Backend, Device, Executable, Slot, SlotError } from "../backend";
+import {
+  Backend,
+  Device,
+  Executable,
+  Slot,
+  SlotError,
+  UnsupportedRoutineError,
+} from "../backend";
+import {
+  Routine,
+  Routines,
+  runArgsort,
+  runCholesky,
+  runSort,
+} from "../routine";
 import { tuneNullopt } from "../tuner";
 
 /** Most basic implementation of `Backend` for testing. */
@@ -63,19 +77,44 @@ export class CpuBackend implements Backend {
     return buffer.slice(start, start + count);
   }
 
-  async prepare(kernel: Kernel): Promise<Executable<void>> {
-    return this.prepareSync(kernel);
+  async prepareKernel(kernel: Kernel): Promise<Executable<void>> {
+    return this.prepareKernelSync(kernel);
   }
 
-  prepareSync(kernel: Kernel): Executable<void> {
+  prepareKernelSync(kernel: Kernel): Executable<void> {
     return new Executable(kernel, undefined);
   }
 
-  dispatch(
-    { kernel }: Executable<void>,
-    inputs: Slot[],
-    outputs: Slot[],
-  ): void {
+  async prepareRoutine(routine: Routine): Promise<Executable> {
+    return this.prepareRoutineSync(routine);
+  }
+
+  prepareRoutineSync(routine: Routine): Executable {
+    return new Executable(routine, undefined);
+  }
+
+  dispatch(exe: Executable<void>, inputs: Slot[], outputs: Slot[]): void {
+    if (exe.source instanceof Routine) {
+      const { name, type } = exe.source;
+      const inputArrays = inputs.map((slot, i) =>
+        dtypedArray(type.inputDtypes[i], this.#getBuffer(slot)),
+      );
+      const outputArrays = outputs.map((slot, i) =>
+        dtypedArray(type.outputDtypes[i], this.#getBuffer(slot)),
+      );
+      switch (name) {
+        case Routines.Sort:
+          return runSort(type, inputArrays, outputArrays);
+        case Routines.Argsort:
+          return runArgsort(type, inputArrays, outputArrays);
+        case Routines.Cholesky:
+          return runCholesky(type, inputArrays, outputArrays);
+        default:
+          throw new UnsupportedRoutineError(name, this.type);
+      }
+    }
+
+    const kernel = exe.source as Kernel;
     const { exp, epilogue } = tuneNullopt(kernel);
     const inputBuffers = inputs.map((slot) => this.#getBuffer(slot));
     const outputBuffers = outputs.map((slot) => this.#getBuffer(slot));
