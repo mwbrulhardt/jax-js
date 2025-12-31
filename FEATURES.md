@@ -115,12 +115,12 @@ Most operations behave the same way as they do in JAX.
 | `acos`                | 🟢      |                                         |
 | `acosh`               | 🟢      |                                         |
 | `add`                 | 🟢      |                                         |
-| `all`                 | 🟠      |                                         |
+| `all`                 | 🟢      |                                         |
 | `allclose`            | 🟡      | no `equal_nan` option                   |
 | `amax`                | ⚪️      | alias of `max`                          |
 | `amin`                | ⚪️      | alias of `min`                          |
 | `angle`               | ⚪️      | complex numbers                         |
-| `any`                 | 🟠      |                                         |
+| `any`                 | 🟢      |                                         |
 | `append`              | 🟠      |                                         |
 | `apply_along_axis`    | 🟠      |                                         |
 | `apply_over_axes`     | 🟠      |                                         |
