@@ -1038,8 +1038,8 @@ export class Array extends Tracer {
         const routine = new Routine(Routines.Argsort, {
           inputShapes: [x.aval.shape],
           inputDtypes: [x.aval.dtype],
-          outputShapes: [x.aval.shape],
-          outputDtypes: [DType.Int32],
+          outputShapes: [x.aval.shape, x.aval.shape],
+          outputDtypes: [x.aval.dtype, DType.Int32],
         });
         return Array.#routine(routine, [x], [false]);
       },

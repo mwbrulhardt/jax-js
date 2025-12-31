@@ -893,7 +893,10 @@ export const abstractEvalRules: { [P in Primitive]: AbstractEvalRule<P> } = {
   [Primitive.Argsort]([x]) {
     if (x.ndim === 0)
       throw new TypeError("argsort: requires at least 1D input");
-    return [new ShapedArray(x.shape, DType.Int32, false)];
+    return [
+      ShapedArray.fromAval(x),
+      new ShapedArray(x.shape, DType.Int32, false),
+    ];
   },
   [Primitive.TriangularSolve]([a, b]) {
     if (a.ndim < 2)

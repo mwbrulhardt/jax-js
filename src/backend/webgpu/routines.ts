@@ -46,7 +46,8 @@ ${needsF16 ? "enable f16;" : ""}
 ${headerWgsl}
 
 @group(0) @binding(0) var<storage, read> input: array<${ty}>;
-@group(0) @binding(1) var<storage, read_write> output: array<${outputIndices ? "i32" : ty}>;
+@group(0) @binding(1) var<storage, read_write> output: array<${ty}>;
+${outputIndices ? `@group(0) @binding(2) var<storage, read_write> output_idx: array<i32>;` : ""}
 
 var<workgroup> shared_vals: array<${ty}, ${paddedN}>;
 ${outputIndices ? `var<workgroup> shared_idx: array<i32, ${paddedN}>;` : ""}
@@ -124,10 +125,12 @@ ${
   }
 
   if (idx0 < ${n}u) {
-    output[base + idx0] = ${outputIndices ? "shared_idx" : "shared_vals"}[idx0];
+    output[base + idx0] = shared_vals[idx0];
+    ${outputIndices ? `output_idx[base + idx0] = shared_idx[idx0];` : ""}
   }
   if (idx1 < ${n}u) {
-    output[base + idx1] = ${outputIndices ? "shared_idx" : "shared_vals"}[idx1];
+    output[base + idx1] = shared_vals[idx1];
+    ${outputIndices ? `output_idx[base + idx1] = shared_idx[idx1];` : ""}
   }
 }
 `.trim();

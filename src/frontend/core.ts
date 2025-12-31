@@ -441,7 +441,7 @@ export function sort(x: TracerValue) {
 export function argsort(x: TracerValue) {
   const nd = ndim(x);
   if (nd === 0) throw new Error("argsort: requires at least 1D input");
-  return bind1(Primitive.Argsort, [x]);
+  return bind(Primitive.Argsort, [x]);
 }
 
 export function bind1<P extends Primitive>(
@@ -850,11 +850,11 @@ export abstract class Tracer {
    */
   argsort(axis: number = -1): this {
     axis = checkAxis(axis, this.ndim);
-    if (axis === this.ndim - 1) return argsort(this) as this;
+    if (axis === this.ndim - 1) return argsort(this)[1] as this;
     const perm = range(this.ndim);
     perm.splice(axis, 1);
     perm.push(axis);
-    return argsort(this.transpose(perm)).transpose(
+    return argsort(this.transpose(perm))[1].transpose(
       invertPermutation(perm),
     ) as this;
   }

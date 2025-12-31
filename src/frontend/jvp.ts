@@ -296,10 +296,16 @@ const jvpRules: { [P in Primitive]: JvpRule<P> } = {
   [Primitive.Pad]: linearTangentsJvp(Primitive.Pad),
   [Primitive.Sort]([x], [dx]) {
     // Propagate both primals and derivatives along the sorted order.
-    const idx = argsort(x.ref);
-    return [[gather(x, [idx.ref], [-1], -1)], [gather(dx, [idx], [-1], -1)]];
+    const [y, idx] = argsort(x);
+    return [[y], [gather(dx, [idx], [-1], -1)]];
   },
-  [Primitive.Argsort]: zeroTangentsJvp(Primitive.Argsort),
+  [Primitive.Argsort]([x], [dx]) {
+    const [y, idx] = argsort(x);
+    return [
+      [y, idx.ref],
+      [gather(dx, [idx.ref], [-1], -1), zerosLike(idx)],
+    ];
+  },
   [Primitive.TriangularSolve]([a, b], [da, db], { unitDiagonal }) {
     // A @ X.T = B.T  =>  dA @ X.T + A @ dX.T = dB.T
     // So: A @ dX.T = dB.T - dA @ X.T

@@ -87,15 +87,17 @@ function runSort(type: RoutineType, [x]: DataArray[], [y]: DataArray[]) {
   }
 }
 
-function runArgsort(type: RoutineType, [x]: DataArray[], [y]: DataArray[]) {
+function runArgsort(type: RoutineType, [x]: DataArray[], [y, yi]: DataArray[]) {
   const xs = type.inputShapes[0];
   if (xs.length === 0) throw new Error("argsort: cannot sort a scalar");
   const n = xs[xs.length - 1];
   for (let offset = 0; offset < y.length; offset += n) {
     const ar = x.subarray(offset, offset + n);
     const out = y.subarray(offset, offset + n);
-    for (let i = 0; i < n; i++) out[i] = i;
-    out.sort((a, b) => ar[a] - ar[b]);
+    const outi = yi.subarray(offset, offset + n);
+    for (let i = 0; i < n; i++) outi[i] = i;
+    outi.sort((a, b) => ar[a] - ar[b]);
+    for (let i = 0; i < n; i++) out[i] = ar[outi[i]];
   }
 }
 

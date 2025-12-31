@@ -380,9 +380,9 @@ const vmapRules: Partial<{ [P in Primitive]: VmapRule<P> }> = {
   },
   [Primitive.Argsort](axisSize, [x], [xBdim]) {
     assertNonNull(xBdim);
-    if (xBdim !== x.ndim - 1) return [[argsort(x)], [xBdim]];
+    if (xBdim !== x.ndim - 1) return [argsort(x), [xBdim, xBdim]];
     x = moveBatchAxis(axisSize, xBdim, 0, x);
-    return [[argsort(x)], [0]];
+    return [argsort(x), [0, 0]];
   },
   [Primitive.TriangularSolve](
     axisSize,
