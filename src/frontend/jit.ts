@@ -929,9 +929,6 @@ function splitGraphDataflow(backend: Backend, jaxpr: Jaxpr): Set<Var> {
   while (p2idx < jaxpr.eqns.length) {
     const eqn = jaxpr.eqns[p2idx++];
     const deps: Set<Var>[] = [];
-    if (eqn.outBinders.some((v) => blackNodes.has(v))) {
-      continue; // Already black, no need to check inputs.
-    }
     for (const input of eqn.inputs) {
       if (input instanceof Var) {
         if (blackNodes.has(input)) deps.push(new Set([input]));
@@ -972,7 +969,7 @@ function splitGraphDataflow(backend: Backend, jaxpr: Jaxpr): Set<Var> {
       }
       const assocVar = eqn.inputs[assocInput] as Var;
       p2idx = varToDefn.get(assocVar)!; // backtrack to that equation
-      for (const out of jaxpr.eqns[p2idx].outBinders) {
+      for (const out of jaxpr.eqns[p2idx++].outBinders) {
         blackNodes.add(out);
       }
     } else {
