@@ -118,8 +118,8 @@ interface PrimitiveParamsImpl extends Record<Primitive, Record<string, any>> {
   [Primitive.Flip]: { axis: number[] };
   [Primitive.Shrink]: { slice: Pair[] };
   [Primitive.Pad]: { width: Pair[] };
-  [Primitive.Jit]: { name: string; jaxpr: Jaxpr; numConsts: number };
   [Primitive.TriangularSolve]: { unitDiagonal: boolean };
+  [Primitive.Jit]: { name: string; jaxpr: Jaxpr; numConsts: number };
 }
 
 /** Type of parameters taken by each primitive. */
