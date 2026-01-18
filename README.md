@@ -43,6 +43,56 @@ way to get started on a blank HTML page.
 </script>
 ```
 
+## Feature comparison
+
+Here's a quick, high-level comparison with other popular web ML runtimes:
+
+| Feature                         | jax-js               | TensorFlow.js        | onnxruntime-web    |
+| ------------------------------- | -------------------- | -------------------- | ------------------ |
+| **Overview**                    |                      |                      |                    |
+| Primary usage                   | Research + inference | Inference and arrays | Inference only     |
+| API style                       | JAX/NumPy compatible | TensorFlow-like      | ONNX graph runtime |
+| Latest release                  | 2026                 | ⚠️ 2024              | 2026               |
+| Speed                           | Fastest              | Fast                 | Fastest            |
+| Bundle size (gzip)              | 80 KB                | 269 KB               | 90 KB + 61 MB Wasm |
+| **Autodiff & JIT**              |                      |                      |                    |
+| Gradients                       | ✅                   | ✅                   | ❌                 |
+| Jacobian and Hessian            | ✅                   | ❌                   | ❌                 |
+| `jvp()` forward differentiation | ✅                   | ❌                   | ❌                 |
+| `jit()` kernel fusion           | ✅                   | ❌                   | ❌                 |
+| `vmap()` auto-vectorization     | ✅                   | ❌                   | ❌                 |
+| Graph capture                   | ✅                   | ❌                   | ✅                 |
+| **Backends & Data**             |                      |                      |                    |
+| WebGPU backend                  | ✅                   | 🟡 Preview           | ✅                 |
+| WebGL backend                   | ✅                   | ✅                   | ✅                 |
+| Wasm (CPU) backend              | ✅                   | ✅                   | ✅                 |
+| Eager array API                 | ✅                   | ✅                   | ❌                 |
+| Run ONNX models                 | ✅                   | ❌                   | ✅                 |
+| Read safetensors                | ✅                   | ❌                   | ❌                 |
+| Float64                         | ✅                   | ❌                   | ❌                 |
+| Float32                         | ✅                   | ✅                   | ✅                 |
+| Float16                         | ✅                   | ❌                   | ✅                 |
+| BFloat16                        | ❌                   | ❌                   | ❌                 |
+| Packed Uint8                    | ❌                   | ❌                   | 🟡 Partial         |
+| Mixed precision                 | ✅                   | ❌                   | ✅                 |
+| Mixed devices                   | ✅                   | ❌                   | ❌                 |
+| **Ops & Numerics**              |                      |                      |                    |
+| Arithmetic functions            | ✅                   | ✅                   | ✅                 |
+| Matrix multiplication           | ✅                   | ✅                   | ✅                 |
+| General einsum                  | ✅                   | 🟡 Partial           | 🟡 Partial         |
+| Sorting                         | ✅                   | ❌                   | ❌                 |
+| Activation functions            | ✅                   | ✅                   | ✅                 |
+| NaN/Inf numerics                | ✅                   | ✅                   | ✅                 |
+| Basic convolutions              | ✅                   | ✅                   | ✅                 |
+| n-d convolutions                | ✅                   | ❌                   | ✅                 |
+| Strided/dilated convolution     | ✅                   | ✅                   | ✅                 |
+| Cholesky / Lstsq                | ✅                   | ❌                   | ❌                 |
+| LU / Solve / Determinant        | ✅                   | ❌                   | ❌                 |
+| SVD                             | ✅                   | ❌                   | ❌                 |
+| FFT                             | ✅                   | ✅                   | ✅                 |
+| Basic RNG (Uniform, Normal)     | ✅                   | ✅                   | ✅                 |
+| Advanced RNG                    | ✅                   | ❌                   | ❌                 |
+
 ## Tutorial
 
 Programming in `jax-js` looks [very similar to JAX](https://docs.jax.dev/en/latest/jax-101.html),
@@ -271,15 +321,18 @@ self-contained way in other projects.
 
 ### Performance
 
-We haven't spent a ton of time optimizing yet, but performance is generally pretty good. `jit` is
-very helpful for fusing operations together, and it's a feature only available on the web in jax-js.
-The default kernel-tuning heuristics get about 3000 GFLOP/s for matrix multiplication on an M4 Pro
-chip ([try it](https://jax-js.com/bench/matmul)).
+The WebGPU runtime includes an ML compiler with tile-aware optimizations, tuned for indiidual
+browsers. Also, this library uniquely has the `jit()` feature that fuses operations together and
+records an execution graph. The kernels achieve over 3000 GFLOP/s for matrix multiplication on an M4
+Pro chip ([try it](https://jax-js.com/bench/matmul)).
 
-For that example, it's around the same GFLOP/s as
+On that example, it's significantly faster than both
 [TensorFlow.js](https://github.com/tensorflow/tfjs) and
 [ONNX Runtime Web](https://www.npmjs.com/package/onnxruntime-web), which both use handwritten
-libraries of custom kernels (versus jax-js, which generates kernels with an ML compiler).
+libraries of custom kernels.
+
+It's still early though. There's a lot of low-hanging fruit to continue optimizing the library, as
+well as unique optimizations such as FlashAttention variants.
 
 ### API Reference
 
