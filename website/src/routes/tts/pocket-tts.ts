@@ -929,14 +929,10 @@ export function runConvTranspose1d(
 }
 
 export type StreamingConv1d = {
-  // TODO: Actually make this streaming, needs to init `kernel-stride` zeros
-  // state and maintain this on each successive forward pass.
   conv: Conv1d;
 };
 
 export type StreamingConvTranspose1d = {
-  // TODO: Actually make this streaming, needs to init `kernel-stride` zeros
-  // state and maintain this on each successive forward pass.
   convtr: ConvTranspose1d;
 };
 
