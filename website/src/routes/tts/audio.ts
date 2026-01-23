@@ -4,10 +4,7 @@ const SAMPLE_RATE = 24000; // 24kHz sample rate for Mimi codec
 
 export interface AudioPlayer {
   /** Play a chunk of PCM samples (Float32Array in range [-1, 1]). */
-  playChunk(samples: Float32Array): void;
-
-  /** Resume audio context if suspended (required after user interaction). */
-  resume(): Promise<void>;
+  playChunk(samples: Float32Array): Promise<void>;
 
   /** Wait for all queued audio to finish, then close the audio context. */
   close(): Promise<void>;
@@ -84,7 +81,13 @@ export function createStreamingPlayer(): AudioPlayer {
   const chunks: Float32Array[] = [];
 
   return {
-    playChunk(samples: Float32Array) {
+    async playChunk(samples: Float32Array) {
+      // Resume audio context if suspended, which is common on mobile after idle
+      // periods or keyboard use.
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+
       chunks.push(samples.slice());
 
       const buffer = audioCtx.createBuffer(1, samples.length, SAMPLE_RATE);
@@ -103,12 +106,6 @@ export function createStreamingPlayer(): AudioPlayer {
       lastEndedPromise = new Promise((resolve) => {
         source.onended = () => resolve();
       });
-    },
-
-    async resume() {
-      if (audioCtx.state === "suspended") {
-        await audioCtx.resume();
-      }
     },
 
     async close() {

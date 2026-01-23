@@ -109,7 +109,7 @@ export async function playTTS(
           );
         }
         await lastAudioPromise;
-        player.playChunk(audioPcm);
+        await player.playChunk(audioPcm);
       })();
     }
   } finally {
