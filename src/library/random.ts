@@ -25,7 +25,7 @@ import {
   sqrt,
   squeeze,
   stack,
-  tan
+  tan,
 } from "./numpy";
 import { cholesky } from "./numpy-linalg";
 
@@ -194,7 +194,9 @@ export const categorical = jit(
 
     if (replace) {
       // Gumbel max trick: generate independent noise for each sample
-      const logitsShapeForGumbel = [...shape.slice(shape.length - batchShape.length)];
+      const logitsShapeForGumbel = [
+        ...shape.slice(shape.length - batchShape.length),
+      ];
       logitsShapeForGumbel.splice(normalizedAxis, 0, numCategories);
 
       const gumbelShape = [...shapePrefix, ...logitsShapeForGumbel];
@@ -203,7 +205,8 @@ export const categorical = jit(
       // Expand logits to match shape prefix (add leading singleton dims)
       const numPrefixDims = shapePrefix.length;
       const prefixAxes = range(numPrefixDims);
-      const expandedLogits = numPrefixDims > 0 ? expandDims(logits, prefixAxes) : logits;
+      const expandedLogits =
+        numPrefixDims > 0 ? expandDims(logits, prefixAxes) : logits;
       const adjustedAxis = normalizedAxis + numPrefixDims;
 
       return argmax(noise.add(expandedLogits), adjustedAxis);
@@ -224,7 +227,10 @@ export const categorical = jit(
       const movedLogits = moveaxis(noisyLogits, normalizedAxis, -1);
 
       // Get the k largest indices
-      const sliceArgs = [...range(movedLogits.ndim - 1).map((): [] => []), [-k] as [number]];
+      const sliceArgs = [
+        ...range(movedLogits.ndim - 1).map((): [] => []),
+        [-k] as [number],
+      ];
       const topKIndices = argsort(movedLogits, -1).slice(...sliceArgs);
 
       // Reshape to desired output shape

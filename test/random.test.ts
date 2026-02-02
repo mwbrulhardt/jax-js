@@ -136,7 +136,9 @@ suite.each(devices)("device:%s", (device) => {
         const count = 10000;
         const probs = [0.1, 0.2, 0.3, 0.4];
         const logits = np.log(np.array(probs));
-        const samples: number[] = random.categorical(key, logits, -1, [count]).js();
+        const samples: number[] = random
+          .categorical(key, logits, -1, [count])
+          .js();
 
         // Count occurrences of each category
         const counts = samples.reduce(
